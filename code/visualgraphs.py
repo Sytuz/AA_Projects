@@ -13,12 +13,15 @@ import matplotlib
 k_full = [0.125, 0.25, 0.5, 0.75]
 k_values = [125, 25, 50, 75]
 
+iterations = [250, 500, 750, 1000]
+
 # File paths for the data
 OLD_EXHAUSTIVE_PATH = "../data/exhaustive_v1/exhaustive_v1_p_{}.csv"
 EXHAUSTIVE_PATH = "../data/exhaustive/exhaustive_p_{}.csv"
 BIGGEST_WEIGHT_FIRST_PATH = "../data/biggest_weight_first_compare/biggest_weight_first_compare_p_{}.csv"
 SMALLEST_DEGREE_FIRST_PATH = "../data/smallest_degree_first_compare/smallest_degree_first_compare_p_{}.csv"
 WEIGHT_TO_DEGREE_PATH = "../data/weight_to_degree_compare/weight_to_degree_compare_p_{}.csv"
+MONTE_CARLO_PATH = "../data/randomized_maximum_weight_independent_set_compare/p_{}/results_{}.csv"
 
 FULL_BIGGEST_WEIGHT_FIRST_PATH = "../data/biggest_weight_first/biggest_weight_first_p_{}.csv"
 FULL_SMALLEST_DEGREE_FIRST_PATH = "../data/smallest_degree_first/smallest_degree_first_p_{}.csv"
@@ -38,6 +41,7 @@ EXHAUSTIVE = 'Exhaustive'
 BIGGEST_WEIGHT_FIRST = 'Biggest Weight First'
 SMALLEST_DEGREE_FIRST = 'Smallest Degree First'
 WEIGHT_TO_DEGREE = 'Weight to Degree'
+MONTE_CARLO = 'Monte Carlo'
 
 ALGORITHMS = [OLD_EXHAUSTIVE, EXHAUSTIVE, BIGGEST_WEIGHT_FIRST, SMALLEST_DEGREE_FIRST, WEIGHT_TO_DEGREE]
 
@@ -46,6 +50,7 @@ EXH = 'Exhaustive'
 WMAX = 'WMax - Biggest Weight First'
 DMIN = 'DMin - Smallest Degree First'
 WDMIX = 'WDMix - Weight to Degree'
+MC = 'Monte Carlo'
 
 LABELS = {
     EXHAUSTIVE: EXH,
@@ -68,7 +73,11 @@ dataframes = {
     EXHAUSTIVE: {k: pd.read_csv(EXHAUSTIVE_PATH.format(k)) for k in k_values},
     BIGGEST_WEIGHT_FIRST: {k: pd.read_csv(BIGGEST_WEIGHT_FIRST_PATH.format(k)) for k in k_values},
     SMALLEST_DEGREE_FIRST: {k: pd.read_csv(SMALLEST_DEGREE_FIRST_PATH.format(k)) for k in k_values},
-    WEIGHT_TO_DEGREE: {k: pd.read_csv(WEIGHT_TO_DEGREE_PATH.format(k)) for k in k_values}
+    WEIGHT_TO_DEGREE: {k: pd.read_csv(WEIGHT_TO_DEGREE_PATH.format(k)) for k in k_values},
+}
+
+dataframes_randomized = {
+    MONTE_CARLO: {k: {i: pd.read_csv(MONTE_CARLO_PATH.format(k, i)) for i in iterations} for k in k_values}
 }
 
 dataframes_heuristic_full = {
@@ -81,6 +90,7 @@ dataframes_heuristic_full = {
 for algorithm, dfs in dataframes.items():
     for k, df in dfs.items():
         df[SOLUTION_SIZE] = df['Solution'].apply(len)
+        
         
 """ ----- Helper Functions ----- """
 
@@ -302,9 +312,7 @@ def exhaustive_vs_greedy_size_weight():
 
         # Plot Solution Size and Total Weight for each algorithm
         for algorithm in ALGORITHMS[1:]:
-            print(algorithm)
             alpha_value = 0.65 if algorithm != EXHAUSTIVE else 1
-            print(alpha_value)
             dataframes[algorithm][k][SOLUTION_SIZE].head(space).plot(ax=axes[idx, 0], label=LABELS[algorithm], color=colors[algorithm], alpha=alpha_value)
             dataframes[algorithm][k][TOTAL_WEIGHT].head(space).plot(ax=axes[idx, 1], label=LABELS[algorithm], color=colors[algorithm], alpha=alpha_value)
         
@@ -431,10 +439,49 @@ def exhaustive_vs_greedy_error_ratio_and_accuracy():
 
     # Save or show the plot
     plt.savefig('../images/error_grid_2x2.png', dpi=300)
-    plt.show()
     
     # Log the conclusion of the function
     print("exhaustive_vs_greedy_error_ratio_and_accuracy() - Done")
+    
+def monte_carlo_precision():
+    """ Check the results of the Monte Carlo algorithm and its precision, comparing the effect of iterations (Fig.8) """
+    
+    # Initialize the plot grid (2x2 layout)
+    _, axs = plt.subplots(2, 2, figsize=(15, 12))  # 2x2 grid
+    axs = axs.flatten()  # Flatten the 2D array of axes to 1D for easier iteration
+
+    # Iterate through each k value
+    for idx, k in enumerate(k_values):
+        
+        # Calculate precision by comparing to the exhaustive algorithm data
+        exhaustive_weights = dataframes[EXHAUSTIVE][k][TOTAL_WEIGHT].values
+        precision_values = []
+
+        for i in iterations:
+            monte_carlo_weights = dataframes_randomized[MONTE_CARLO][k][i][TOTAL_WEIGHT].head(len(exhaustive_weights)).values
+            precision = np.mean(monte_carlo_weights / exhaustive_weights)
+            precision_values.append(precision)
+        # Plot the precision values for each iteration count
+        axs[idx].plot(iterations, precision_values, marker='o', color='blue', linestyle='-', linewidth=1.5)
+        
+        # Set plot labels and title
+        axs[idx].set_xlabel('Iterations', fontsize=12)
+        axs[idx].set_ylabel('Precision', fontsize=12)
+        axs[idx].set_title(f'Precision for Monte Carlo with k={k_full[idx]}', fontsize=14)
+        
+        # Set the grid for better readability
+        axs[idx].grid(True)
+        
+    # Adjust layout for the 2x2 grid
+    plt.tight_layout()
+    plt.subplots_adjust(wspace=0.2, hspace=0.3)  # Adjust horizontal and vertical space
+
+    # Save or show the plot
+    plt.savefig('../images/monte_carlo_precision_grid_2x2.png', dpi=300)
+    
+    # Log the conclusion of the function
+    print("monte_carlo_precision() - Done")
+    
         
 if __name__ == "__main__":
     remarks_graphs()
@@ -444,3 +491,4 @@ if __name__ == "__main__":
     greedy_comparison_operations_time()
     solution_comparison()
     exhaustive_vs_greedy_error_ratio_and_accuracy()
+    monte_carlo_precision()

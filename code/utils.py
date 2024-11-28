@@ -105,7 +105,7 @@ class utils:
     # - n_max: the maximum number of nodes a test graph can have
     # - sample_size: the number of nodes to increment by in each iteration
     # - stored_graphs: whether to use pre-generated graphs
-    def stress_test(func, p, max_time_minutes, filename="stress_test_results.csv", save_results=True, n_max=1000, sample_size=5, stored_graphs=True):
+    def stress_test(func, p, max_time_minutes, filename="stress_test_results.csv", save_results=True, n_max=1000, sample_size=5, stored_graphs=True, iterations=None, restart_probability=None):
         """Runs a stress test for a single p value and optionally saves the results to a specified CSV file."""
         max_time_seconds = max_time_minutes * 60
         stored_graphs_filename = f"../graphs/graphs_p_{p}.pkl"
@@ -138,7 +138,10 @@ class utils:
             
             # Measure the time taken by the function on the generated graph
             start = time.time()
-            result, op = func(G)
+            if iterations is not None:
+                result, op = func(G, iterations=iterations, restart_prob=restart_probability)
+            else:
+                result, op = func(G)
             end = time.time()
             
             # Calculate elapsed time
@@ -169,34 +172,87 @@ class utils:
         if file:
             file.close()
 
-
     @staticmethod
-    # Function to run stress tests for a function across multiple p values and save results to separate CSV files
-    # - func: the function to test
-    # - p_values: a list of edge probabilities to test
-    # - max_time_minutes: the maximum time allowed for a single test
-    # - base_filename: the base name for the CSV files to save the results
-    # - save_results: whether to save the results to CSV files
-    # - n_max: the maximum number of nodes a test graph can have
-    # - sample_size: the number of nodes to increment by in each iteration
-    # - stored_graphs: whether to use pre-generated graphs    
-    def full_stress_test(func, p_values=[0.125, 0.25, 0.5, 0.75], max_time_minutes=2, base_filename="full_stress_test_results", save_results=True, n_max=1000, sample_size=5, stored_graphs=True):
-        """Runs stress tests for a function across multiple p values and saves results to separate CSV files."""
-        # Create a separate directory for the stress test results. Delete the directory if it already exists.
-        
+    def full_stress_test(func, p_values=[0.125, 0.25, 0.5, 0.75], max_time_minutes=2, 
+                        base_filename="full_stress_test_results", save_results=True, 
+                        n_max=1000, sample_size=5, stored_graphs=True, 
+                        max_iterations=None, iteration_step=None, restart_probability=0.1):
+        """
+        Runs stress tests for a function across multiple p values and optionally iterations.
+        Results are saved in a structured directory format.
+
+        Args:
+            func: The function to test.
+            p_values: A list of edge probabilities to test.
+            max_time_minutes: Maximum time allowed for a single test.
+            base_filename: Base name for the results directory.
+            save_results: Whether to save the results to CSV files.
+            n_max: Maximum number of nodes in a test graph.
+            sample_size: Increment size for nodes in each test.
+            stored_graphs: Whether to use pre-generated graphs.
+            max_iterations: Maximum iterations for algorithms that require them (optional).
+            iteration_step: Incremental step for iterations (required if max_iterations is given).
+        """
+        # Validate parameters for iteration-based algorithms
+        if max_iterations is not None and iteration_step is None:
+            raise ValueError("iteration_step must be specified if max_iterations is provided.")
+
+        # Base directory for all results
         base_folder = f"../data/{base_filename}"
+        
         if save_results:
+            # Clean up and recreate the base folder
             if os.path.exists(base_folder):
-                for file in os.listdir(base_folder):
-                    os.remove(os.path.join(base_folder, file))
+                for item in os.listdir(base_folder):
+                    item_path = os.path.join(base_folder, item)
+                    if os.path.isfile(item_path):
+                        os.remove(item_path)
+                    elif os.path.isdir(item_path):
+                        for sub_item in os.listdir(item_path):
+                            sub_item_path = os.path.join(item_path, sub_item)
+                            if os.path.isfile(sub_item_path):
+                                os.remove(sub_item_path)
+                        os.rmdir(item_path)
+
             else:
                 os.makedirs(base_folder)
+        
+        # Loop over each edge probability (p value)
         for p in p_values:
-            print(f"Starting stress test for p = {p}")
-            # Generate a unique filename for each p value
-            filename = f"{base_filename}/{base_filename}_p_{int(p * 1000) if p == 0.125 else int(p * 100)}.csv"
-            utils.stress_test(func, p, max_time_minutes, filename=filename, save_results=save_results, n_max=n_max, sample_size=sample_size, stored_graphs=stored_graphs)
-            print(f"Completed stress test for p = {p}, results saved in {filename}\n")
+            print(f"Starting stress tests for p = {p}")
+
+            # Create a folder for the current p value
+            p_folder = os.path.join(base_folder, f"p_{int(p * 1000) if p == 0.125 else int(p * 100)}")
+            os.makedirs(p_folder, exist_ok=True)
+
+            if max_iterations is not None:
+                # Iteration-based testing
+                for iteration_count in range(iteration_step, max_iterations + 1, iteration_step):
+                    print(f"  Testing with {iteration_count} iterations...")
+
+                    # Generate a unique filename for this test
+                    filename = os.path.join(p_folder, f"results_{iteration_count}.csv")
+
+                    # Run the stress test and save results
+                    utils.stress_test(
+                        func, p, max_time_minutes, filename=filename,
+                        save_results=save_results, n_max=n_max,
+                        sample_size=sample_size, stored_graphs=stored_graphs,
+                        iterations=iteration_count, restart_probability=restart_probability
+                    )
+            else:                
+                # Generate a unique filename for this test
+                filename = os.path.join(p_folder, "results.csv")
+
+                # Run the stress test and save results
+                utils.stress_test(
+                    func, p, max_time_minutes, filename=filename,
+                    save_results=save_results, n_max=n_max,
+                    sample_size=sample_size, stored_graphs=stored_graphs
+                )
+            
+            print(f"Completed stress tests for p = {p}.\n")
+
 
     @staticmethod
     def visualize_solution(G, mwis_set, store_png=False):

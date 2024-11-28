@@ -194,12 +194,11 @@ class algorithms:
         Returns:
             A tuple of the maximum independent set found and the operation count.
         """
-        op = 0
+
         best_set = set()
         best_weight = 0
 
         for _ in range(iterations):
-            op += 1  # Increment for each iteration
             current_set = set()
             current_weight = 0
 
@@ -209,11 +208,9 @@ class algorithms:
             excluded_nodes = set()
 
             for node in nodes:
-                op += 1  # Increment for loop operations
                 if node in excluded_nodes:
                     continue
 
-                # Add the node probabilistically or based on its weight
                 if random.random() > restart_prob:  # Favor deterministic selection
                     current_set.add(node)
                     current_weight += G.nodes[node]['weight']
@@ -226,12 +223,20 @@ class algorithms:
                     excluded_nodes.add(random_node)
                     excluded_nodes.update(G.neighbors(random_node))
 
+                    # Also consider the current node ('node')
+                    if node not in excluded_nodes:
+                        current_set.add(node)
+                        current_weight += G.nodes[node]['weight']
+                        excluded_nodes.add(node)
+                        excluded_nodes.update(G.neighbors(node))
+
+
             # Update the best set if the current set is better
             if current_weight > best_weight:
                 best_set = current_set
                 best_weight = current_weight
 
-        return best_set, op
+        return best_set, _
 
     
     @staticmethod
@@ -279,35 +284,58 @@ class algorithms:
         return max_set, op
 
     @staticmethod
-    def compare_precision(func, p, n, print_results=False):
+    def compare_precision(func, p, n, print_results=False, iterations=1, func_iterations=1000, restart_prob=0.1):
         """Compares the precision of a given function against the exhaustive (v2) algorithm."""
+        """If the function is randomized, it will run multiple iterations to calculate the average precision."""
         
         matches = 0
         start_time = time.time()  # Start timing the process
+        
+        if iterations > 1:
+            # Run multiple iterations of the randomized algorithm
+            for _ in tqdm(range(iterations), desc="Testing graphs", unit="iteration"):
+                for i in range(1, n + 1):
+                    # Generate graph with i nodes and edge probability p
+                    G = utils.create_graph_v4(i, p)
+                    
+                    # Run the exhaustive (v2) algorithm
+                    result_exhaustive, _ = algorithms.exhaustive_v2(G)
+                    
+                    # Run the function to test
+                    result_func, _ = func(G, func_iterations, restart_prob)
+                    
+                    if print_results:
+                        print(f"Graph with {i} nodes:")
+                        print("Exhaustive algorithm:", result_exhaustive)
+                        print("Function result:", result_func)
+                        print()
+                    
+                    # Check if the results match
+                    if result_exhaustive == result_func:
+                        matches += 1
+        else:
+            for i in tqdm(range(1, n + 1), desc="Testing graphs", unit="graph"):
+                # Generate graph with i nodes and edge probability p
+                G = utils.create_graph_v4(i, p)
+                
+                # Run the exhaustive (v2) algorithm
+                result_exhaustive, _ = algorithms.exhaustive_v2(G)
+                
+                # Run the function to test
+                result_func, _ = func(G)
 
-        # Use tqdm to create a progress bar
-        for i in tqdm(range(1, n + 1), desc="Testing graphs", unit="graph"):
-            # Generate graph with i nodes and edge probability p
-            G = utils.create_graph_v4(i, p)
-            
-            # Run the exhaustive (v2) algorithm
-            result_exhaustive, _ = algorithms.exhaustive_v2(G)
-            
-            # Run the function to test
-            result_func, _ = func(G)
-
-            if print_results:
-                print(f"Graph with {i} nodes:")
-                print("Exhaustive algorithm:", result_exhaustive)
-                print("Function result:", result_func)
-                print()
-            
-            # Check if the results match
-            if result_exhaustive == result_func:
-                matches += 1
+                if print_results:
+                    print(f"Graph with {i} nodes:")
+                    print("Exhaustive algorithm:", result_exhaustive)
+                    print("Function result:", result_func)
+                    print()
+                
+                # Check if the results match
+                if result_exhaustive == result_func:
+                    matches += 1
         
         # Calculate the precision as a percentage
-        precision = (matches / n) * 100
+        precision = (matches / (n * iterations)) * 100
         elapsed_time = time.time() - start_time  # Calculate total time taken
         
         print(f"Total time taken: {elapsed_time:.2f} seconds")

@@ -30,9 +30,25 @@ def full_test():
     utils.full_stress_test(algorithms.smallest_degree_first_v1, base_filename="smallest_degree_first", stored_graphs=True, sample_size=100)
     utils.full_stress_test(algorithms.weight_to_degree_v1, base_filename="weight_to_degree", stored_graphs=True, sample_size=100)
     
+def full_test_with_iterations():
+    """ Full test for algorithms that require iterations (randomized algorithms) """
+    
+    # Standard Randomized, Smaller For Comparing With Exhaustive
+    utils.full_stress_test(algorithms.randomized_maximum_weight_independent_set, base_filename="randomized_maximum_weight_independent_set_compare", n_max=800, stored_graphs=False, sample_size=1, max_iterations=1000, iteration_step=250)
+    
+def quick_precision_test(name, algorithm, k, n, iterations=0):
+    """ Quick test to check the precision of an algorithm """
+    print(f"Testing {name}'s precision")
+    precision = algorithms.compare_precision(algorithm, k, n, iterations=iterations)
+    print(precision)
+    print(f"Precision: {precision}")
+    
 def main():
-    graph_creation()
-    full_test()
+    """ Main function """
+    #quick_precision_test("Monte Carlo", algorithms.randomized_maximum_weight_independent_set, 0.75, 100, 20)
+    #graph_creation()
+    #full_test()
+    full_test_with_iterations()
     
 if __name__ == "__main__":
     main()
