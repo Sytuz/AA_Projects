@@ -9,7 +9,7 @@ import matplotlib
 # This file is a collection of functions that generate the visualizations for the project report
 # It is sort of disorganized because I had to move the functions from the Jupyter Notebook to this file
 
-""" Constants and file paths for the visualizations """
+""" ----- Constants ----- """
 k_full = [0.125, 0.25, 0.5, 0.75]
 k_values = [125, 25, 50, 75]
 
@@ -20,107 +20,120 @@ BIGGEST_WEIGHT_FIRST_PATH = "../data/biggest_weight_first_compare/biggest_weight
 SMALLEST_DEGREE_FIRST_PATH = "../data/smallest_degree_first_compare/smallest_degree_first_compare_p_{}.csv"
 WEIGHT_TO_DEGREE_PATH = "../data/weight_to_degree_compare/weight_to_degree_compare_p_{}.csv"
 
+FULL_BIGGEST_WEIGHT_FIRST_PATH = "../data/biggest_weight_first/biggest_weight_first_p_{}.csv"
+FULL_SMALLEST_DEGREE_FIRST_PATH = "../data/smallest_degree_first/smallest_degree_first_p_{}.csv"
+FULL_WEIGHT_TO_DEGREE_PATH = "../data/weight_to_degree/weight_to_degree_p_{}.csv"
+
 # Constants used for the plots
 SOLUTION_SIZE = 'Solution Size'
 GRAPH_SIZE_AXIS = 'Graph Size (|V|)'
 TOTAL_WEIGHT = 'Total Weight'
 EXECUTION_TIME = 'Execution Time (seconds)'
+NUMBER_OF_OPERATIONS = 'Number of Operations'
+UPPER_RIGHT = 'upper right'
 
-file_paths = {
-    0.125: [EXHAUSTIVE_PATH.format(125),
-            BIGGEST_WEIGHT_FIRST_PATH.format(125),
-            SMALLEST_DEGREE_FIRST_PATH.format(125),
-            WEIGHT_TO_DEGREE_PATH.format(125)],
-    0.25: [EXHAUSTIVE_PATH.format(25),
-           BIGGEST_WEIGHT_FIRST_PATH.format(25),
-           SMALLEST_DEGREE_FIRST_PATH.format(25),
-           WEIGHT_TO_DEGREE_PATH.format(25)],
-    0.5: [EXHAUSTIVE_PATH.format(50),
-          BIGGEST_WEIGHT_FIRST_PATH.format(50),
-          SMALLEST_DEGREE_FIRST_PATH.format(50),
-          WEIGHT_TO_DEGREE_PATH.format(50)],
-    0.75: [EXHAUSTIVE_PATH.format(75),
-           BIGGEST_WEIGHT_FIRST_PATH.format(75),
-           SMALLEST_DEGREE_FIRST_PATH.format(75),
-           WEIGHT_TO_DEGREE_PATH.format(75)]
+# Constants used to identify the algorithms in the data
+OLD_EXHAUSTIVE = 'Old Exhaustive'
+EXHAUSTIVE = 'Exhaustive'
+BIGGEST_WEIGHT_FIRST = 'Biggest Weight First'
+SMALLEST_DEGREE_FIRST = 'Smallest Degree First'
+WEIGHT_TO_DEGREE = 'Weight to Degree'
+
+ALGORITHMS = [OLD_EXHAUSTIVE, EXHAUSTIVE, BIGGEST_WEIGHT_FIRST, SMALLEST_DEGREE_FIRST, WEIGHT_TO_DEGREE]
+
+# Labels
+EXH = 'Exhaustive'
+WMAX = 'WMax - Biggest Weight First'
+DMIN = 'DMin - Smallest Degree First'
+WDMIX = 'WDMix - Weight to Degree'
+
+LABELS = {
+    EXHAUSTIVE: EXH,
+    BIGGEST_WEIGHT_FIRST: WMAX,
+    SMALLEST_DEGREE_FIRST: DMIN,
+    WEIGHT_TO_DEGREE: WDMIX
 }
 
-""" Functions for the various graphs and tables in the report """
+# Define colors for each algorithm
+colors = {
+    EXHAUSTIVE: 'red',
+    BIGGEST_WEIGHT_FIRST: 'orange',
+    SMALLEST_DEGREE_FIRST: 'green',
+    WEIGHT_TO_DEGREE: 'purple'
+}
+
+# Load dataframes for each algorithm and k value
+dataframes = {
+    OLD_EXHAUSTIVE: {k: pd.read_csv(OLD_EXHAUSTIVE_PATH.format(k)) for k in k_values},
+    EXHAUSTIVE: {k: pd.read_csv(EXHAUSTIVE_PATH.format(k)) for k in k_values},
+    BIGGEST_WEIGHT_FIRST: {k: pd.read_csv(BIGGEST_WEIGHT_FIRST_PATH.format(k)) for k in k_values},
+    SMALLEST_DEGREE_FIRST: {k: pd.read_csv(SMALLEST_DEGREE_FIRST_PATH.format(k)) for k in k_values},
+    WEIGHT_TO_DEGREE: {k: pd.read_csv(WEIGHT_TO_DEGREE_PATH.format(k)) for k in k_values}
+}
+
+dataframes_heuristic_full = {
+    BIGGEST_WEIGHT_FIRST: {k: pd.read_csv(FULL_BIGGEST_WEIGHT_FIRST_PATH.format(k)) for k in k_values},
+    SMALLEST_DEGREE_FIRST: {k: pd.read_csv(FULL_SMALLEST_DEGREE_FIRST_PATH.format(k)) for k in k_values},
+    WEIGHT_TO_DEGREE: {k: pd.read_csv(FULL_WEIGHT_TO_DEGREE_PATH.format(k)) for k in k_values}
+}
+
+# Add 'Solution_Size' column to all dataframes
+for algorithm, dfs in dataframes.items():
+    for k, df in dfs.items():
+        df[SOLUTION_SIZE] = df['Solution'].apply(len)
+        
+""" ----- Helper Functions ----- """
+
+# Function to calculate the mean with available data
+def calculate_mean(ops_dict, graph_size):
+    values = [ops[graph_size] for ops in ops_dict.values() if graph_size < len(ops)]
+    return np.mean(values) if values else np.nan
+
+# Calculate the average number of operations and execution time for each graph size across the k values
+def calculate_avg_data(ops_dict, time_dict):
+    max_graph_size = max(len(ops) for ops in ops_dict.values())
+    avg_ops = [calculate_mean(ops_dict, i) for i in range(max_graph_size)]
+    avg_time = [calculate_mean(time_dict, i) for i in range(max_graph_size)]
+    return avg_ops, avg_time
+
+""" ----- Functions for the various graphs and tables in the report ----- """
 def remarks_graphs():
     """ Create the graphs for the remarks section (Fig.1) """
 
-    # Load data
-    df12_5 = pd.read_csv(EXHAUSTIVE_PATH.format(125))
-    df25 = pd.read_csv(EXHAUSTIVE_PATH.format(25))
-    df50 = pd.read_csv(EXHAUSTIVE_PATH.format(50))
-    df75 = pd.read_csv(EXHAUSTIVE_PATH.format(75))
-
-    # Calculate solution size
-    df12_5[SOLUTION_SIZE] = df12_5['Solution'].apply(len)
-    df25[SOLUTION_SIZE] = df25['Solution'].apply(len)
-    df50[SOLUTION_SIZE] = df50['Solution'].apply(len)
-    df75[SOLUTION_SIZE] = df75['Solution'].apply(len)
-
     # Set up subplots side by side
-    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    _, axes = plt.subplots(1, 2, figsize=(12, 6))
 
-    # Plot Solution Size
-    axes[0].plot(df12_5['Solution Size'], label='k=0.125')
-    axes[0].plot(df25['Solution Size'], label='k=0.25')
-    axes[0].plot(df50['Solution Size'], label='k=0.50')
-    axes[0].plot(df75['Solution Size'], label='k=0.75')
+    # Plot Solution Size and Total Weight for each k value
+    for k, df in dataframes[EXHAUSTIVE].items():
+        axes[0].plot(df[SOLUTION_SIZE], label=f'k={k / 100 if k != 125 else 0.125}')
+        axes[1].plot(df[TOTAL_WEIGHT], label=f'k={k / 100 if k != 125 else 0.125}')
+        
+    # Set labels and legend for both plots
     axes[0].set_xlabel(GRAPH_SIZE_AXIS)
-    axes[0].set_ylabel('Solution Size')
+    axes[0].set_ylabel(SOLUTION_SIZE)
     axes[0].set_title('Evolution of Solution Size for Different k Values')
     axes[0].legend()
 
-    # Plot Total Weight of Solution
-    axes[1].plot(df12_5[TOTAL_WEIGHT], label='k=0.125')
-    axes[1].plot(df25[TOTAL_WEIGHT], label='k=0.25')
-    axes[1].plot(df50[TOTAL_WEIGHT], label='k=0.50')
-    axes[1].plot(df75[TOTAL_WEIGHT], label='k=0.75')
     axes[1].set_xlabel(GRAPH_SIZE_AXIS)
     axes[1].set_ylabel(TOTAL_WEIGHT)
     axes[1].set_title('Evolution of Solution Weight for Different k Values')
     axes[1].legend()
 
-    # Show the plots
+    # Save the plots
     plt.tight_layout()
-
     plt.savefig('../images/evolution_of_solution.png', dpi=300)
-    plt.show()
+    plt.close()
+    
+    # Log the conclusion of the function
+    print("remarks_graphs() - Done")
+    
 
 def exhaustive_comparison_time():
     """ Compare the execution time of the two exhaustive algorithms (Fig.2) """
     
-    # Read data for all graph sizes
-    df_v1_125 = pd.read_csv(OLD_EXHAUSTIVE_PATH.format(125))
-    df_v1_25 = pd.read_csv(OLD_EXHAUSTIVE_PATH.format(25))
-    df_v1_50 = pd.read_csv(OLD_EXHAUSTIVE_PATH.format(50))
-    df_v1_75 = pd.read_csv(OLD_EXHAUSTIVE_PATH.format(75))
-
-    df_v1 = {
-        125: df_v1_125,
-        25: df_v1_25,
-        50: df_v1_50,
-        75: df_v1_75
-    }
-
-    df_v2_125 = pd.read_csv(EXHAUSTIVE_PATH.format(125))
-    df_v2_25 = pd.read_csv(EXHAUSTIVE_PATH.format(25))
-    df_v2_50 = pd.read_csv(EXHAUSTIVE_PATH.format(50))
-    df_v2_75 = pd.read_csv(EXHAUSTIVE_PATH.format(75))
-
-    df_v2 = {
-        125: df_v2_125,
-        25: df_v2_25,
-        50: df_v2_50,
-        75: df_v2_75
-    }
-
     # Extract data for execution times by graph size and k
-    algorithm1_times = {k: df_v1[k]['Execution Time (seconds)'].to_list() for k in k_values}
-    algorithm2_times = {k: df_v2[k]['Execution Time (seconds)'].to_list() for k in k_values}
+    algorithm1_times = {k: dataframes[OLD_EXHAUSTIVE][k][EXECUTION_TIME].to_list() for k in k_values}
+    algorithm2_times = {k: dataframes[EXHAUSTIVE][k][EXECUTION_TIME].to_list() for k in k_values}
 
     # Determine the maximum graph size across all k values
     max_graph_size_v1 = max(len(times) for times in algorithm1_times.values())
@@ -154,7 +167,7 @@ def exhaustive_comparison_time():
     plt.yscale('log')
 
     # Adjust legend to stay inside the plot
-    plt.legend(loc='upper right', bbox_to_anchor=(0.95, 0.95), fontsize='small')
+    plt.legend(loc=UPPER_RIGHT, bbox_to_anchor=(0.95, 0.95), fontsize='small')
 
     # Layout adjustments
     plt.tight_layout()
@@ -162,49 +175,20 @@ def exhaustive_comparison_time():
     # Save the plot
     plt.savefig('../images/execution_time_comparison_average.png', dpi=300)
     plt.close()
+    
+    # Log the conclusion of the function
+    print("exhaustive_comparison_time() - Done")
 
 def exhaustive_comparison_operations():
     """ Compare the number of operations of the two exhaustive algorithms (Fig.3) """
     
-    # Read data for all graph sizes
-    df_v1_125 = pd.read_csv("../data/exhaustive_v1/exhaustive_v1_p_125.csv")
-    df_v1_25 = pd.read_csv("../data/exhaustive_v1/exhaustive_v1_p_25.csv")
-    df_v1_50 = pd.read_csv("../data/exhaustive_v1/exhaustive_v1_p_50.csv")
-    df_v1_75 = pd.read_csv("../data/exhaustive_v1/exhaustive_v1_p_75.csv")
-
-    df_v1 = {
-        125: df_v1_125,
-        25: df_v1_25,
-        50: df_v1_50,
-        75: df_v1_75
-    }
-
-    df_v2_125 = pd.read_csv("../data/exhaustive/exhaustive_p_125.csv")
-    df_v2_25 = pd.read_csv("../data/exhaustive/exhaustive_p_25.csv")
-    df_v2_50 = pd.read_csv("../data/exhaustive/exhaustive_p_50.csv")
-    df_v2_75 = pd.read_csv("../data/exhaustive/exhaustive_p_75.csv")
-
-    df_v2 = {
-        125: df_v2_125,
-        25: df_v2_25,
-        50: df_v2_50,
-        75: df_v2_75
-    }
-
-    k_values = [125, 25, 50, 75]  # Use actual values
-
     # Extract data for number of operations by graph size and k
-    algorithm1_ops = {k: df_v1[k]['Number of Operations'] for k in k_values}
-    algorithm2_ops = {k: df_v2[k]['Number of Operations'] for k in k_values}
+    algorithm1_ops = {k: dataframes[OLD_EXHAUSTIVE][k][NUMBER_OF_OPERATIONS] for k in k_values}
+    algorithm2_ops = {k: dataframes[EXHAUSTIVE][k][NUMBER_OF_OPERATIONS] for k in k_values}
 
     # Find the maximum graph size across all k values
     max_graph_size_v1 = max(len(ops) for ops in algorithm1_ops.values())
     max_graph_size_v2 = max(len(ops) for ops in algorithm2_ops.values())
-
-    # Function to calculate the mean with available data
-    def calculate_mean(ops_dict, graph_size):
-        values = [ops[graph_size] for ops in ops_dict.values() if graph_size < len(ops)]
-        return np.mean(values) if values else np.nan
 
     # Calculate the average number of operations for each graph size across the k values
     avg_algorithm1_ops = [calculate_mean(algorithm1_ops, i) for i in range(max_graph_size_v1)]
@@ -222,14 +206,14 @@ def exhaustive_comparison_operations():
 
     # Set labels and legend for Execution Time plot
     plt.xlabel(GRAPH_SIZE_AXIS)
-    plt.ylabel('Number of Operations')
+    plt.ylabel(NUMBER_OF_OPERATIONS)
     plt.title('Average Number of Operations by Graph Size (for k in [12.5, 25, 50, 75])')
 
     # Use logarithmic scale for y-axis
     plt.yscale('log')
 
     # Adjust legend to stay inside the plot
-    plt.legend(loc='upper right', bbox_to_anchor=(0.95, 0.95), fontsize='small')
+    plt.legend(loc=UPPER_RIGHT, bbox_to_anchor=(0.95, 0.95), fontsize='small')
 
     # Layout adjustments
     plt.tight_layout()
@@ -238,112 +222,52 @@ def exhaustive_comparison_operations():
     plt.savefig('../images/number_of_operations_comparison_average.png', dpi=300)
     plt.close()
     
+    # Log the conclusion of the function
+    print("exhaustive_comparison_operations() - Done")
+    
 def greedy_comparison_operations_time():
     """ Compare the number of operations and execution time of the three greedy algorithms (Fig.4) """
 
-    # Read data for all graph sizes for the three algorithms
-    df_biggest_weight_first_125 = pd.read_csv("../data/biggest_weight_first/biggest_weight_first_p_125.csv")
-    df_biggest_weight_first_25 = pd.read_csv("../data/biggest_weight_first/biggest_weight_first_p_25.csv")
-    df_biggest_weight_first_50 = pd.read_csv("../data/biggest_weight_first/biggest_weight_first_p_50.csv")
-    df_biggest_weight_first_75 = pd.read_csv("../data/biggest_weight_first/biggest_weight_first_p_75.csv")
+    def extract_data_avg(dataframes, column_name):
+        """ Extract and calculate average data for all algorithms. """
+        return [
+            calculate_avg_data(
+                {k: dataframes[algorithm][k][column_name] for k in k_values},
+                {k: dataframes[algorithm][k][EXECUTION_TIME] for k in k_values}
+            )
+            for algorithm in [BIGGEST_WEIGHT_FIRST, SMALLEST_DEGREE_FIRST, WEIGHT_TO_DEGREE]
+        ]
 
-    df_smallest_degree_first_125 = pd.read_csv("../data/smallest_degree_first/smallest_degree_first_p_125.csv")
-    df_smallest_degree_first_25 = pd.read_csv("../data/smallest_degree_first/smallest_degree_first_p_25.csv")
-    df_smallest_degree_first_50 = pd.read_csv("../data/smallest_degree_first/smallest_degree_first_p_50.csv")
-    df_smallest_degree_first_75 = pd.read_csv("../data/smallest_degree_first/smallest_degree_first_p_75.csv")
+    # Extract and calculate averages for operations and time
+    avg_data = extract_data_avg(dataframes_heuristic_full, NUMBER_OF_OPERATIONS)
+    avg_ops = [data[0] for data in avg_data]
+    avg_time = [data[1] for data in avg_data]
 
-    df_weight_to_degree_125 = pd.read_csv("../data/weight_to_degree/weight_to_degree_p_125.csv")
-    df_weight_to_degree_25 = pd.read_csv("../data/weight_to_degree/weight_to_degree_p_25.csv")
-    df_weight_to_degree_50 = pd.read_csv("../data/weight_to_degree/weight_to_degree_p_50.csv")
-    df_weight_to_degree_75 = pd.read_csv("../data/weight_to_degree/weight_to_degree_p_75.csv")
-
-    # Store data for each algorithm
-    df_biggest_weight_first = {
-        125: df_biggest_weight_first_125,
-        25: df_biggest_weight_first_25,
-        50: df_biggest_weight_first_50,
-        75: df_biggest_weight_first_75
-    }
-
-    df_smallest_degree_first = {
-        125: df_smallest_degree_first_125,
-        25: df_smallest_degree_first_25,
-        50: df_smallest_degree_first_50,
-        75: df_smallest_degree_first_75
-    }
-
-    df_weight_to_degree = {
-        125: df_weight_to_degree_125,
-        25: df_weight_to_degree_25,
-        50: df_weight_to_degree_50,
-        75: df_weight_to_degree_75
-    }
-
-    k_values = [125, 25, 50, 75]  # Use actual values
-
-    # Extract data for time and number of operations by graph size and k
-    def extract_data(df_dict, k_values, column_name):
-        return {k: df_dict[k][column_name] for k in k_values}
-
-    biggest_weight_first_ops = extract_data(df_biggest_weight_first, k_values, 'Number of Operations')
-    smallest_degree_first_ops = extract_data(df_smallest_degree_first, k_values, 'Number of Operations')
-    weight_to_degree_ops = extract_data(df_weight_to_degree, k_values, 'Number of Operations')
-
-    # Extract Execution Time data (Assuming there's a 'Execution Time' column in the CSVs)
-    biggest_weight_first_time = extract_data(df_biggest_weight_first, k_values, 'Execution Time (seconds)')
-    smallest_degree_first_time = extract_data(df_smallest_degree_first, k_values, 'Execution Time (seconds)')
-    weight_to_degree_time = extract_data(df_weight_to_degree, k_values, 'Execution Time (seconds)')
-
-    # Function to calculate the mean with available data
-    def calculate_mean(ops_dict, graph_size):
-        values = [ops[graph_size] for ops in ops_dict.values() if graph_size < len(ops)]
-        return np.mean(values) if values else np.nan
-
-    # Calculate the average number of operations and execution time for each graph size across the k values
-    def calculate_avg_data(ops_dict, time_dict):
-        max_graph_size = max(len(ops) for ops in ops_dict.values())
-        avg_ops = [calculate_mean(ops_dict, i) for i in range(max_graph_size)]
-        avg_time = [calculate_mean(time_dict, i) for i in range(max_graph_size)]
-        return avg_ops, avg_time
-
-    avg_biggest_weight_first_ops, avg_biggest_weight_first_time = calculate_avg_data(biggest_weight_first_ops, biggest_weight_first_time)
-    avg_smallest_degree_first_ops, avg_smallest_degree_first_time = calculate_avg_data(smallest_degree_first_ops, smallest_degree_first_time)
-    avg_weight_to_degree_ops, avg_weight_to_degree_time = calculate_avg_data(weight_to_degree_ops, weight_to_degree_time)
-
-    # Plotting both graphs side by side
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-
-    # Colors for distinguishing lines
-    colors = matplotlib.colormaps["tab10"]  # Use the updated method for color mapping
-
+    _, axes = plt.subplots(1, 2, figsize=(14, 6))
     scale = 100
+    x_values = [100 + x * scale for x in range(len(avg_ops[0]))]
 
-    # Plot 1: Number of Operations
-    axes[0].plot([100 +x * scale for x in range(len(avg_biggest_weight_first_ops))], avg_biggest_weight_first_ops, color=colors(1), linewidth=1.5, label='WMax - Biggest Weight First')
-    axes[0].plot([100 +x * scale for x in range(len(avg_smallest_degree_first_ops))], avg_smallest_degree_first_ops, color=colors(2), linewidth=1.5, label='DMin - Smallest Degree First')
-    axes[0].plot([100 +x * scale for x in range(len(avg_weight_to_degree_ops))], avg_weight_to_degree_ops, color=colors(4), linewidth=1.5, label='WDMix - Weight to Degree')
+    # Titles and labels for plots
+    titles = ['Average Number of Operations', 'Average Execution Time (s)']
+    y_labels = [NUMBER_OF_OPERATIONS, 'Execution Time (s)']
+    data = [avg_ops, avg_time]
+    labels = [WMAX, DMIN, WDMIX]
 
-    axes[0].set_xlabel(GRAPH_SIZE_AXIS)
-    axes[0].set_ylabel('Number of Operations')
-    axes[0].set_title('Average Number of Operations by Graph Size (for k in [12.5, 25, 50, 75])')
-    axes[0].legend(loc='upper right', bbox_to_anchor=(0.95, 0.95), fontsize='small')
+    # Plot data
+    for i, ax in enumerate(axes):
+        for idx, y_data in enumerate(data[i]):
+            ax.plot(x_values, y_data, color=colors[ALGORITHMS[idx+2]], linewidth=1.5, label=labels[idx])
+        ax.set_xlabel(GRAPH_SIZE_AXIS)
+        ax.set_ylabel(y_labels[i])
+        ax.set_title(f'{titles[i]} by Graph Size (for k in [12.5, 25, 50, 75])')
+        ax.legend(loc=UPPER_RIGHT, bbox_to_anchor=(0.95, 0.95), fontsize='small')
 
-    # Plot 2: Execution Time
-    axes[1].plot([100 +x * scale for x in range(len(avg_biggest_weight_first_time))], avg_biggest_weight_first_time, color=colors(1), linewidth=1.5, label='WMax - Biggest Weight First')
-    axes[1].plot([100 +x * scale for x in range(len(avg_smallest_degree_first_time))], avg_smallest_degree_first_time, color=colors(2), linewidth=1.5, label='DMin - Smallest Degree First')
-    axes[1].plot([100 +x * scale for x in range(len(avg_weight_to_degree_time))], avg_weight_to_degree_time, color=colors(4), linewidth=1.5, label='WDMix - Weight to Degree')
-
-    axes[1].set_xlabel(GRAPH_SIZE_AXIS)
-    axes[1].set_ylabel('Execution Time (s)')
-    axes[1].set_title('Average Execution Time by Graph Size (for k in [12.5, 25, 50, 75])')
-    axes[1].legend(loc='upper right', bbox_to_anchor=(0.95, 0.95), fontsize='small')
-
-    # Adjust layout
     plt.tight_layout()
-
-    # Save the plot
     plt.savefig('../images/greedy_comparison_time_and_operations.png', dpi=300)
     plt.close()
+    
+    # Log the conclusion of the function
+    print("greedy_comparison_operations_time() - Done")
 
 def solution_comparison():
     """ Compare the solutions found by the algorithms (Fig.5) """
@@ -354,53 +278,41 @@ def solution_comparison():
     k = 0.5
     test_graph = utils.create_graph_v4(20, k)
 
-    algorithms_sets['Exhaustive'], _ = algorithms.exhaustive_v2(test_graph)
-    algorithms_sets['Biggest Weight First'], _ = algorithms.biggest_weight_first_v2(test_graph)
-    algorithms_sets['Smallest Degree First'], _ = algorithms.smallest_degree_first_v1(test_graph)
-    algorithms_sets['Weight to Degree'], _ = algorithms.weight_to_degree_v1(test_graph)
+    algorithms_sets[EXHAUSTIVE], _ = algorithms.exhaustive_v2(test_graph)
+    algorithms_sets[BIGGEST_WEIGHT_FIRST], _ = algorithms.biggest_weight_first_v2(test_graph)
+    algorithms_sets[SMALLEST_DEGREE_FIRST], _ = algorithms.smallest_degree_first_v1(test_graph)
+    algorithms_sets[WEIGHT_TO_DEGREE], _ = algorithms.weight_to_degree_v1(test_graph)
 
     utils.visual_compare_algorithms(test_graph, algorithms_sets, k=k, store_png=True)
+    
+    # Log the conclusion of the function
+    print("solution_comparison() - Done")
     
 def exhaustive_vs_greedy_size_weight():
     """ Compare the solution size and total weight of the greedy algorithms with the exhaustive algorithm (Fig.6) """
     """ Also generates the tables for the ranking of the algorithms (Tables 1 and 2) """
 
     # Create a figure with subplots
-    fig, axes = plt.subplots(4, 2, figsize=(15, 20), constrained_layout=True)
-
+    _, axes = plt.subplots(4, 2, figsize=(15, 20), constrained_layout=True)
+    
     # Loop over each k value
-    for idx, k in enumerate(k_full):
-        # Load data for each algorithm
-        df1 = pd.read_csv(file_paths[k][0])
-        df2 = pd.read_csv(file_paths[k][1])
-        df3 = pd.read_csv(file_paths[k][2])
-        df4 = pd.read_csv(file_paths[k][3])
+    for idx, k in enumerate(k_values):
+        
+        space = len(dataframes[EXHAUSTIVE][k])
 
-        space = 39 if k == 0.125 else 55 if k == 0.25 else 118 if k == 0.5 else 238
-
-        # Calculate Solution Size and Total Weight for each dataframe
-        df1['Solution Size'] = df1['Solution'].apply(len)
-        df2['Solution Size'] = df2['Solution'].apply(len)
-        df3['Solution Size'] = df3['Solution'].apply(len)
-        df4['Solution Size'] = df4['Solution'].apply(len)
-
-        # Plot Solution Size
-        df2['Solution Size'].head(space).plot(ax=axes[idx, 0], label='WMax - Biggest Weight First', color='orange', alpha=0.65)
-        df3['Solution Size'].head(space).plot(ax=axes[idx, 0], label='DMin - Smallest Degree First', color='green', alpha=0.65)
-        df4['Solution Size'].head(space).plot(ax=axes[idx, 0], label='WDMix -Weight to Degree', color='purple', alpha=0.65)
-        df1['Solution Size'].head(space).plot(ax=axes[idx, 0], label='Exhaustive', color='red', linewidth=2, zorder=10)
-
+        # Plot Solution Size and Total Weight for each algorithm
+        for algorithm in ALGORITHMS[1:]:
+            print(algorithm)
+            alpha_value = 0.65 if algorithm != EXHAUSTIVE else 1
+            print(alpha_value)
+            dataframes[algorithm][k][SOLUTION_SIZE].head(space).plot(ax=axes[idx, 0], label=LABELS[algorithm], color=colors[algorithm], alpha=alpha_value)
+            dataframes[algorithm][k][TOTAL_WEIGHT].head(space).plot(ax=axes[idx, 1], label=LABELS[algorithm], color=colors[algorithm], alpha=alpha_value)
+        
         # Set labels for Solution Size plot
         axes[idx, 0].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
-        axes[idx, 0].set_ylabel('Solution Size', fontsize=8)
+        axes[idx, 0].set_ylabel(SOLUTION_SIZE, fontsize=8)
         axes[idx, 0].set_title(f'Solution Size for k={k}', fontsize=10)
         axes[idx, 0].legend(fontsize=7, loc='upper left')
-
-        # Plot Total Weight
-        df2[TOTAL_WEIGHT].head(space).plot(ax=axes[idx, 1], label='WMax - Biggest Weight First', color='orange', alpha=0.65)
-        df3[TOTAL_WEIGHT].head(space).plot(ax=axes[idx, 1], label='DMin - Smallest Degree First', color='green', alpha=0.65)
-        df4[TOTAL_WEIGHT].head(space).plot(ax=axes[idx, 1], label='WDMix - Weight to Degree', color='purple', alpha=0.65)
-        df1[TOTAL_WEIGHT].head(space).plot(ax=axes[idx, 1], label='Exhaustive', color='red', linewidth=2, zorder=10)
 
         # Set labels for Total Weight plot
         axes[idx, 1].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
@@ -414,9 +326,9 @@ def exhaustive_vs_greedy_size_weight():
 
         # Calculate ranks per graph instance, handling ties
         for i in range(space):
-            solution_sizes = [df1['Solution Size'][i], df2['Solution Size'][i], df3['Solution Size'][i], df4['Solution Size'][i]]
-            solution_weights = [df1[TOTAL_WEIGHT][i], df2[TOTAL_WEIGHT][i], df3[TOTAL_WEIGHT][i], df4[TOTAL_WEIGHT][i]]
-            solution_speeds = [df1['Execution Time (seconds)'][i], df2['Execution Time (seconds)'][i], df3['Execution Time (seconds)'][i], df4['Execution Time (seconds)'][i]]
+            solution_sizes = [dataframes[algorithm][k][SOLUTION_SIZE][i] for algorithm in ALGORITHMS[1:]]
+            solution_weights = [dataframes[algorithm][k][TOTAL_WEIGHT][i] for algorithm in ALGORITHMS[1:]]
+            solution_speeds = [dataframes[algorithm][k][EXECUTION_TIME][i] for algorithm in ALGORITHMS[1:]]
             
             # Use rankdata with 'min' to rank from largest to smallest (1 is best, 4 is worst)
             size_ranks[:, i] = 5 - rankdata(solution_sizes, method='max')
@@ -430,7 +342,7 @@ def exhaustive_vs_greedy_size_weight():
 
         # Prepare ranking table data for current k
         ranking_data_k = {
-            'Algorithm': ['Exhaustive', 'Biggest Weight First', 'Smallest Degree First', 'Weight to Degree'],
+            'Algorithm': ALGORITHMS[1:],
             'Solution Size Rank': np.round(size_ranks, 2),
             'Total Weight Rank': np.round(weight_ranks, 2),
             'Speed Rank': np.round(speed_ranks, 2),
@@ -447,62 +359,71 @@ def exhaustive_vs_greedy_size_weight():
     plt.savefig('../images/solution_size_weight_comparison_all.png', dpi=300)
     plt.close()
     
-def exhaustive_vs_greedy_error_ratio():
-    """ Compare the error ratio of the greedy algorithms in relation to the exhaustive algorithm (Fig.7) """
-
-    # Define k values and file paths
-    k_values = [0.125, 0.25, 0.5, 0.75]
-
+    # Log the conclusion of the function
+    print("exhaustive_vs_greedy_size_weight() - Done")
+    
+def exhaustive_vs_greedy_error_ratio_and_accuracy():
+    """ Compare the error ratio and accuracy of the greedy algorithms in relation to the exhaustive algorithm (Fig.7) """
 
     # Initialize the plot grid (2x2 layout)
-    fig, axs = plt.subplots(2, 2, figsize=(15, 12))  # 2x2 grid
+    _, axs = plt.subplots(2, 2, figsize=(15, 12))  # 2x2 grid
     axs = axs.flatten()  # Flatten the 2D array of axes to 1D for easier iteration
+    
+    # Dictionary to store the results for each k
+    accuracy_precision_results = {}
 
     # Define the colors for each algorithm
     algorithm_colors = {
-        'WMax - Biggest Weight First': 'orange',
-        'DMin - Smallest Degree First': 'green',
-        'WDMix - Weight to Degree': 'purple'
+        WMAX: 'orange',
+        DMIN: 'green',
+        WDMIX: 'purple'
     }
 
     # Iterate through each k value
-    for idx, (k, paths) in enumerate(file_paths.items()):
-        # Load the CSV files for each algorithm
-        df_exhaustive = pd.read_csv(paths[0])
-        df_biggest_weight_first = pd.read_csv(paths[1])
-        df_smallest_degree_first = pd.read_csv(paths[2])
-        df_weight_to_degree = pd.read_csv(paths[3])
+    for idx, k in enumerate(k_values):
         
         # Limit heuristic algorithms to the same solution count as the exhaustive algorithm
-        solution_count = len(df_exhaustive)  # Get the solution count for exhaustive
-        df_exhaustive = df_exhaustive.head(solution_count)
-        df_biggest_weight_first = df_biggest_weight_first.head(solution_count)
-        df_smallest_degree_first = df_smallest_degree_first.head(solution_count)
-        df_weight_to_degree = df_weight_to_degree.head(solution_count)
+        solution_count = len(dataframes[EXHAUSTIVE][k])
+        df_biggest_weight_first = dataframes[BIGGEST_WEIGHT_FIRST][k].head(solution_count)
+        df_smallest_degree_first = dataframes[SMALLEST_DEGREE_FIRST][k].head(solution_count)
+        df_weight_to_degree = dataframes[WEIGHT_TO_DEGREE][k].head(solution_count)
         
         # Structure data in a dictionary for the heuristics
-        algorithms = {
-            'WMax - Biggest Weight First': df_biggest_weight_first,
-            'DMin - Smallest Degree First': df_smallest_degree_first,
-            'WDMix - Weight to Degree': df_weight_to_degree
+        algorithms_cut = {
+            WMAX: df_biggest_weight_first,
+            DMIN: df_smallest_degree_first,
+            WDMIX: df_weight_to_degree
         }
+        
+        # Calculate accuracy and precision for solution weight
+        accuracy_precision_df_weight = utils.calculate_accuracy_precision(dataframes[EXHAUSTIVE][k], algorithms_cut, metric=TOTAL_WEIGHT)
+        accuracy_precision_df_weight['k'] = k  # Add k value for identification
+        
+        # Store the resulting DataFrame in the dictionary
+        accuracy_precision_results[k] = accuracy_precision_df_weight
 
         # Plot error (the difference between greedy and exhaustive solution weight)
-        for name, df in algorithms.items():
+        for name, df in algorithms_cut.items():
             # Calculate error as the difference between exhaustive and greedy solution weight, normalized by exhaustive weight
-            error = (df_exhaustive[TOTAL_WEIGHT].values - df[TOTAL_WEIGHT].values) / df_exhaustive[TOTAL_WEIGHT].values
+            error = (dataframes[EXHAUSTIVE][k][TOTAL_WEIGHT].values - df[TOTAL_WEIGHT].values) / dataframes[EXHAUSTIVE][k][TOTAL_WEIGHT].values
             
             # Plot with the respective color and label
-            axs[idx].plot(df_exhaustive['Node Count'], error, label=name, color=algorithm_colors[name], alpha=0.65)
+            axs[idx].plot(dataframes[EXHAUSTIVE][k]['Node Count'], error, label=name, color=algorithm_colors[name], alpha=0.65)
 
         # Set plot labels and title
         axs[idx].set_xlabel(GRAPH_SIZE_AXIS, fontsize=12)
         axs[idx].set_ylabel('Error (Ratio)', fontsize=12)
         axs[idx].set_title(f'Error (Greedy - Exhaustive) for k={k}', fontsize=14)
-        axs[idx].legend(loc='upper right', fontsize=10)
+        axs[idx].legend(loc=UPPER_RIGHT, fontsize=10)
 
         # Set the grid for better readability
         axs[idx].grid(True)
+        
+    # Concatenate results for all k values into a single DataFrame
+    final_accuracy_precision_df = pd.concat(accuracy_precision_results.values(), ignore_index=True)
+
+    # Save to CSV
+    final_accuracy_precision_df.to_csv('../data/accuracy_precision_summary.csv', index=False)
 
     # Adjust layout for the 2x2 grid
     plt.tight_layout()
@@ -512,67 +433,9 @@ def exhaustive_vs_greedy_error_ratio():
     plt.savefig('../images/error_grid_2x2.png', dpi=300)
     plt.show()
     
-def exhaustive_vs_greedy_deviations_accuracy():
-    """ Generates the content for the tables of deviations and accuracy for the greedy algorithms (Tables 3 and 4) """
-
-    # Define k values and file paths
-    k_values = [0.125, 0.25, 0.5, 0.75]
-    file_paths = {
-        0.125: ["../data/exhaustive/exhaustive_p_125.csv",
-                "../data/biggest_weight_first_compare/biggest_weight_first_compare_p_125.csv",
-                "../data/smallest_degree_first_compare/smallest_degree_first_compare_p_125.csv",
-                "../data/weight_to_degree_compare/weight_to_degree_compare_p_125.csv"],
-        0.25: ["../data/exhaustive/exhaustive_p_25.csv",
-            "../data/biggest_weight_first_compare/biggest_weight_first_compare_p_25.csv",
-            "../data/smallest_degree_first_compare/smallest_degree_first_compare_p_25.csv",
-            "../data/weight_to_degree_compare/weight_to_degree_compare_p_25.csv"],
-        0.5: ["../data/exhaustive/exhaustive_p_50.csv",
-            "../data/biggest_weight_first_compare/biggest_weight_first_compare_p_50.csv",
-            "../data/smallest_degree_first_compare/smallest_degree_first_compare_p_50.csv",
-            "../data/weight_to_degree_compare/weight_to_degree_compare_p_50.csv"],
-        0.75: ["../data/exhaustive/exhaustive_p_75.csv",
-            "../data/biggest_weight_first_compare/biggest_weight_first_compare_p_75.csv",
-            "../data/smallest_degree_first_compare/smallest_degree_first_compare_p_75.csv",
-            "../data/weight_to_degree_compare/weight_to_degree_compare_p_75.csv"]
-    }
-
-    # Dictionary to store the results for each k
-    accuracy_precision_results = {}
-
-    # Loop over each k value
-    for k in k_values:
-        # Load data for each algorithm
-        df_exhaustive = pd.read_csv(file_paths[k][0])
-        df_biggest_weight_first = pd.read_csv(file_paths[k][1])
-        df_smallest_degree_first = pd.read_csv(file_paths[k][2])
-        df_weight_to_degree = pd.read_csv(file_paths[k][3])
+    # Log the conclusion of the function
+    print("exhaustive_vs_greedy_error_ratio_and_accuracy() - Done")
         
-        # Limit heuristic algorithms to the same solution count as the exhaustive algorithm
-        solution_count = len(df_exhaustive)  # Get the solution count for exhaustive
-        df_biggest_weight_first = df_biggest_weight_first.head(solution_count)
-        df_smallest_degree_first = df_smallest_degree_first.head(solution_count)
-        df_weight_to_degree = df_weight_to_degree.head(solution_count)
-        
-        # Create a dictionary of the heuristic algorithms
-        algorithms = {
-            'Biggest Weight First': df_biggest_weight_first,
-            'Smallest Degree First': df_smallest_degree_first,
-            'Weight to Degree': df_weight_to_degree
-        }
-        
-        # Calculate accuracy and precision for solution weight
-        accuracy_precision_df_weight = utils.calculate_accuracy_precision(df_exhaustive, algorithms, metric=TOTAL_WEIGHT)
-        accuracy_precision_df_weight['k'] = k  # Add k value for identification
-        
-        # Store the resulting DataFrame in the dictionary
-        accuracy_precision_results[k] = accuracy_precision_df_weight
-
-    # Concatenate results for all k values into a single DataFrame
-    final_accuracy_precision_df = pd.concat(accuracy_precision_results.values(), ignore_index=True)
-
-    # Save to CSV
-    final_accuracy_precision_df.to_csv('../data/accuracy_precision_summary.csv', index=False)
-    
 if __name__ == "__main__":
     remarks_graphs()
     exhaustive_comparison_time()
@@ -580,5 +443,4 @@ if __name__ == "__main__":
     exhaustive_vs_greedy_size_weight()
     greedy_comparison_operations_time()
     solution_comparison()
-    exhaustive_vs_greedy_error_ratio()
-    exhaustive_vs_greedy_deviations_accuracy()
+    exhaustive_vs_greedy_error_ratio_and_accuracy()

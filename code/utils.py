@@ -278,9 +278,9 @@ class utils:
         # Save the figure as PNG if specified
         if store_png:
             fig.savefig('../images/MWIS_comparison.png', dpi=300)  # Use fig.savefig instead of plt.savefig
-
-        # Show the plot
-        plt.show()
+        else:        
+            # Show the plot
+            plt.show()
             
     @staticmethod
     # Define a function to calculate accuracy and precision for a given k
