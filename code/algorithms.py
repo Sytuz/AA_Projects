@@ -4,7 +4,7 @@ from tqdm import tqdm
 import time
 import math
 import random
-
+import hashlib
 class algorithms:
     # - G: the graph to test (networkx graph object)
 
@@ -181,7 +181,7 @@ class algorithms:
         return max_set, op
     
     @staticmethod
-    def randomized_maximum_weight_independent_set(G, iterations=1000, restart_prob=0.1):
+    def monte_carlo(G, iterations=1000):
         """
         Randomized algorithm to find a near-optimal maximum weight independent set.
         Combines randomness with weighted heuristics.
@@ -189,7 +189,6 @@ class algorithms:
         Args:
             G: A graph with weights on nodes.
             iterations: Number of iterations for refinement.
-            restart_prob: Probability of restarting to introduce randomness (0-1).
 
         Returns:
             A tuple of the maximum independent set found and the operation count.
@@ -197,6 +196,7 @@ class algorithms:
 
         best_set = set()
         best_weight = 0
+        ops = 0  # Initialize operation count
 
         for _ in range(iterations):
             current_set = set()
@@ -208,28 +208,78 @@ class algorithms:
             excluded_nodes = set()
 
             for node in nodes:
+                ops += 1  # Increment for checking if node is excluded
                 if node in excluded_nodes:
                     continue
 
-                if random.random() > restart_prob:  # Favor deterministic selection
-                    current_set.add(node)
-                    current_weight += G.nodes[node]['weight']
-                    excluded_nodes.add(node)
-                    excluded_nodes.update(G.neighbors(node))
-                else:  # Add some randomness
-                    random_node = random.choice([n for n in nodes if n not in excluded_nodes])
-                    current_set.add(random_node)
-                    current_weight += G.nodes[random_node]['weight']
-                    excluded_nodes.add(random_node)
-                    excluded_nodes.update(G.neighbors(random_node))
+                current_set.add(node)
+                ops += 1  # Increment for adding a node to the independent set
 
-                    # Also consider the current node ('node')
-                    if node not in excluded_nodes:
-                        current_set.add(node)
-                        current_weight += G.nodes[node]['weight']
-                        excluded_nodes.add(node)
-                        excluded_nodes.update(G.neighbors(node))
+                current_weight += G.nodes[node]['weight']
+                ops += 1  # Increment for updating current weight
 
+                excluded_nodes.add(node)
+                ops += 1  # Increment for adding a node to the excluded set
+
+                excluded_nodes.update(G.neighbors(node))
+                ops += len(list(G.neighbors(node)))  # Increment for updating neighbors
+
+            # Update the best set if the current set is better
+            if current_weight > best_weight:
+                best_set = current_set
+                best_weight = current_weight
+                ops += 1  # Increment for updating the best solution
+
+        return best_set, ops
+
+    @staticmethod
+    def monte_carlo_with_filter(G, iterations=1000, hash_size=100000):
+        """
+        Monte Carlo algorithm with a mechanism to avoid repeating the same node orders.
+
+        Args:
+            G: A graph with weights on nodes.
+            iterations: Number of iterations for refinement.
+            hash_size: Maximum size of the Bloom-like hash storage.
+
+        Returns:
+            A tuple of the maximum independent set found and the operation count.
+        """
+        best_set = set()
+        best_weight = 0
+
+        # Initialize a set to store hashes of processed node orders
+        processed_hashes = set()
+
+        for _ in range(iterations):
+            # Generate a random order of nodes
+            nodes = list(G.nodes)
+            random.shuffle(nodes)
+
+            # Create a hash of the sorted node order
+            nodes_hash = hashlib.md5(str(nodes).encode()).hexdigest()
+
+            # Check if this order has already been processed
+            if nodes_hash in processed_hashes:
+                continue  # Skip this iteration to avoid duplication
+
+            # Add the hash to the processed set
+            processed_hashes.add(nodes_hash)
+            if len(processed_hashes) > hash_size:  # Optionally cap the size
+                processed_hashes.pop()  # Remove an arbitrary element to maintain size
+            
+            # Initialize current independent set and weight
+            current_set = set()
+            current_weight = 0
+            excluded_nodes = set()
+
+            for node in nodes:
+                if node in excluded_nodes:
+                    continue
+                current_set.add(node)
+                current_weight += G.nodes[node]['weight']
+                excluded_nodes.add(node)
+                excluded_nodes.update(G.neighbors(node))
 
             # Update the best set if the current set is better
             if current_weight > best_weight:
@@ -237,7 +287,6 @@ class algorithms:
                 best_weight = current_weight
 
         return best_set, _
-
     
     @staticmethod
     # Greedy algorithm with random selection factor

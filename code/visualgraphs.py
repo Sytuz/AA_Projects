@@ -13,7 +13,7 @@ import matplotlib
 k_full = [0.125, 0.25, 0.5, 0.75]
 k_values = [125, 25, 50, 75]
 
-iterations = [250, 500, 750, 1000]
+iterations = [25, 50, 100, 250, 500, 750, 1000]
 
 # File paths for the data
 OLD_EXHAUSTIVE_PATH = "../data/exhaustive_v1/exhaustive_v1_p_{}.csv"
@@ -21,7 +21,7 @@ EXHAUSTIVE_PATH = "../data/exhaustive/exhaustive_p_{}.csv"
 BIGGEST_WEIGHT_FIRST_PATH = "../data/biggest_weight_first_compare/biggest_weight_first_compare_p_{}.csv"
 SMALLEST_DEGREE_FIRST_PATH = "../data/smallest_degree_first_compare/smallest_degree_first_compare_p_{}.csv"
 WEIGHT_TO_DEGREE_PATH = "../data/weight_to_degree_compare/weight_to_degree_compare_p_{}.csv"
-MONTE_CARLO_PATH = "../data/randomized_maximum_weight_independent_set_compare/p_{}/results_{}.csv"
+MONTE_CARLO_PATH = "../data/monte_carlo_compare/p_{}/results_{}.csv"
 
 FULL_BIGGEST_WEIGHT_FIRST_PATH = "../data/biggest_weight_first/biggest_weight_first_p_{}.csv"
 FULL_SMALLEST_DEGREE_FIRST_PATH = "../data/smallest_degree_first/smallest_degree_first_p_{}.csv"
@@ -446,9 +446,11 @@ def exhaustive_vs_greedy_error_ratio_and_accuracy():
 def monte_carlo_precision():
     """ Check the results of the Monte Carlo algorithm and its precision, comparing the effect of iterations (Fig.8) """
     
-    # Initialize the plot grid (2x2 layout)
-    _, axs = plt.subplots(2, 2, figsize=(15, 12))  # 2x2 grid
-    axs = axs.flatten()  # Flatten the 2D array of axes to 1D for easier iteration
+    # Initialize the plot
+    plt.figure(figsize=(10, 7))  # Adjust the figure size
+
+    # Define a color palette for the different k values
+    colors = plt.cm.tab10(np.linspace(0, 1, len(k_values)))
 
     # Iterate through each k value
     for idx, k in enumerate(k_values):
@@ -461,26 +463,23 @@ def monte_carlo_precision():
             monte_carlo_weights = dataframes_randomized[MONTE_CARLO][k][i][TOTAL_WEIGHT].head(len(exhaustive_weights)).values
             precision = np.mean(monte_carlo_weights / exhaustive_weights)
             precision_values.append(precision)
+        
         # Plot the precision values for each iteration count
-        axs[idx].plot(iterations, precision_values, marker='o', color='blue', linestyle='-', linewidth=1.5)
-        
-        # Set plot labels and title
-        axs[idx].set_xlabel('Iterations', fontsize=12)
-        axs[idx].set_ylabel('Precision', fontsize=12)
-        axs[idx].set_title(f'Precision for Monte Carlo with k={k_full[idx]}', fontsize=14)
-        
-        # Set the grid for better readability
-        axs[idx].grid(True)
-        
-    # Adjust layout for the 2x2 grid
-    plt.tight_layout()
-    plt.subplots_adjust(wspace=0.2, hspace=0.3)  # Adjust horizontal and vertical space
-
+        plt.plot(iterations, precision_values, marker='o', linestyle='-', linewidth=1.5, label=f'k={k_full[idx]}', color=colors[idx])
+    
+    # Set plot labels, title, and legend
+    plt.xlabel('Iterations', fontsize=12)
+    plt.ylabel('Precision', fontsize=12)
+    plt.title('Monte Carlo Precision for Different k Values', fontsize=14)
+    plt.legend(title='k Values', fontsize=10, loc='best')  # Add a legend
+    plt.grid(True)  # Add grid for better readability
+    
     # Save or show the plot
-    plt.savefig('../images/monte_carlo_precision_grid_2x2.png', dpi=300)
+    plt.savefig('../images/monte_carlo_precision_single_plot.png', dpi=300)
     
     # Log the conclusion of the function
     print("monte_carlo_precision() - Done")
+
     
         
 if __name__ == "__main__":

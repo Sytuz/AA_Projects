@@ -105,7 +105,7 @@ class utils:
     # - n_max: the maximum number of nodes a test graph can have
     # - sample_size: the number of nodes to increment by in each iteration
     # - stored_graphs: whether to use pre-generated graphs
-    def stress_test(func, p, max_time_minutes, filename="stress_test_results.csv", save_results=True, n_max=1000, sample_size=5, stored_graphs=True, iterations=None, restart_probability=None):
+    def stress_test(func, p, max_time_minutes, filename="stress_test_results.csv", save_results=True, n_max=1000, sample_size=5, stored_graphs=True, iterations=None):
         """Runs a stress test for a single p value and optionally saves the results to a specified CSV file."""
         max_time_seconds = max_time_minutes * 60
         stored_graphs_filename = f"../graphs/graphs_p_{p}.pkl"
@@ -120,12 +120,12 @@ class utils:
             file = open(filename, mode='w', newline='')
             writer = csv.writer(file)
             # Write CSV header
-            writer.writerow(["Node Count", "Number of Operations", "Total Weight", "Execution Time (seconds)", "Solution"])
+            writer.writerow(["Node Count", "Number of Operations", "Total Weight", "Execution Time (seconds)", "Solution Size", "Solution"])
         else:
             file = None
             writer = None
 
-        print("  n  | No of Operations | Total Weight | Time (s) | Solution ")
+        print("  n  | No of Operations | Total Weight | Time (s) | Solution Size | Solution ")
         
         # Stress test loop
         n = sample_size
@@ -139,7 +139,7 @@ class utils:
             # Measure the time taken by the function on the generated graph
             start = time.time()
             if iterations is not None:
-                result, op = func(G, iterations=iterations, restart_prob=restart_probability)
+                result, op = func(G, iterations=iterations)
             else:
                 result, op = func(G)
             end = time.time()
@@ -149,16 +149,17 @@ class utils:
 
             # Calculate the total weight of the MWIS set
             total_weight = sum(G.nodes[node]['weight'] for node in result)
+            solution_size = len(result)
 
             # Convert the set to a string
             result_str = str(result)
             
             # Write results to CSV if saving is enabled
             if save_results:
-                writer.writerow([n, op, total_weight, elapsed_time , result_str])
+                writer.writerow([n, op, total_weight, elapsed_time, solution_size, result_str])
             
             # Print the result for the current size
-            print(f"{n:4} | {op:16} | {total_weight:12} | {elapsed_time:8.6f} | {result_str} ")
+            print(f"{n:4} | {op:16} | {total_weight:12} | {elapsed_time:8.6f} | {solution_size:13} | {result_str} ")
             
             # Stop if the elapsed time exceeds the maximum allowed time
             if elapsed_time > max_time_seconds:
@@ -176,7 +177,7 @@ class utils:
     def full_stress_test(func, p_values=[0.125, 0.25, 0.5, 0.75], max_time_minutes=2, 
                         base_filename="full_stress_test_results", save_results=True, 
                         n_max=1000, sample_size=5, stored_graphs=True, 
-                        max_iterations=None, iteration_step=None, restart_probability=0.1):
+                        iterations=None):
         """
         Runs stress tests for a function across multiple p values and optionally iterations.
         Results are saved in a structured directory format.
@@ -193,9 +194,6 @@ class utils:
             max_iterations: Maximum iterations for algorithms that require them (optional).
             iteration_step: Incremental step for iterations (required if max_iterations is given).
         """
-        # Validate parameters for iteration-based algorithms
-        if max_iterations is not None and iteration_step is None:
-            raise ValueError("iteration_step must be specified if max_iterations is provided.")
 
         # Base directory for all results
         base_folder = f"../data/{base_filename}"
@@ -225,9 +223,9 @@ class utils:
             p_folder = os.path.join(base_folder, f"p_{int(p * 1000) if p == 0.125 else int(p * 100)}")
             os.makedirs(p_folder, exist_ok=True)
 
-            if max_iterations is not None:
+            if iterations is not None:
                 # Iteration-based testing
-                for iteration_count in range(iteration_step, max_iterations + 1, iteration_step):
+                for iteration_count in iterations:
                     print(f"  Testing with {iteration_count} iterations...")
 
                     # Generate a unique filename for this test
@@ -238,7 +236,7 @@ class utils:
                         func, p, max_time_minutes, filename=filename,
                         save_results=save_results, n_max=n_max,
                         sample_size=sample_size, stored_graphs=stored_graphs,
-                        iterations=iteration_count, restart_probability=restart_probability
+                        iterations=iteration_count
                     )
             else:                
                 # Generate a unique filename for this test
