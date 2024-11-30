@@ -5,6 +5,9 @@ import time
 import math
 import random
 import hashlib
+import csv
+import os
+
 class algorithms:
     # - G: the graph to test (networkx graph object)
 
@@ -193,78 +196,6 @@ class algorithms:
                 ops += 1  # Increment for updating the best solution
 
         return best_set, ops
-
-    @staticmethod
-    def monte_carlo_with_filter(G, iterations=1000, hash_size=None):
-        """
-        Monte Carlo algorithm with a mechanism to avoid repeating the same node orders.
-
-        Args:
-            G: A graph with weights on nodes.
-            iterations: Number of iterations for refinement.
-            hash_size: Maximum size of the Bloom-like hash storage.
-
-        Returns:
-            A tuple of the maximum independent set found and the operation count.
-        """
-        best_set = set()
-        best_weight = 0
-        
-        ops = 0  # Initialize operation count
-        
-        if hash_size is None:
-            hash_size = iterations
-
-        # Initialize a set to store hashes of processed node orders
-        processed_hashes = set()
-
-        for _ in range(iterations):
-            # Generate a random order of nodes
-            nodes = list(G.nodes)
-            random.shuffle(nodes)
-
-            # Create a hash of the sorted node order
-            nodes_hash = hashlib.md5(str(nodes).encode()).hexdigest()
-
-            # Check if this order has already been processed
-            ops += 1  # Increment for checking if the node order has been processed
-            if nodes_hash in processed_hashes:
-                continue  # Skip this iteration to avoid duplication
-
-            # Add the hash to the processed set
-            processed_hashes.add(nodes_hash)
-            if len(processed_hashes) > hash_size:  # Optionally cap the size
-                processed_hashes.pop()  # Remove an arbitrary element to maintain size
-            
-            # Initialize current independent set and weight
-            current_set = set()
-            current_weight = 0
-            excluded_nodes = set()
-
-            for node in nodes:
-                ops += 1  # Increment for checking if node is excluded
-                if node in excluded_nodes:
-                    continue
-
-                current_set.add(node)
-                ops += 1  # Increment for adding a node to the independent set
-
-                current_weight += G.nodes[node]['weight']
-                ops += 1  # Increment for updating current weight
-
-                excluded_nodes.add(node)
-                ops += 1  # Increment for adding a node to the excluded set
-
-                excluded_nodes.update(G.neighbors(node))
-                ops += len(list(G.neighbors(node)))  # Increment for updating neighbors
-
-            # Update the best set if the current set is better
-            if current_weight > best_weight:
-                best_set = current_set
-                best_weight = current_weight
-                ops += 1  # Increment for updating the best solution
-
-        return best_set, ops
     
     def heuristic_monte_carlo(G, iterations=1000):
         """
@@ -324,105 +255,205 @@ class algorithms:
                 ops += 1
 
         return best_set, ops
-    
-    @staticmethod
-    # Greedy algorithm with random selection factor
-    # Chooses a node based on a weighted heuristic with a random factor
-    def weight_to_degree_with_randomness(G, coin_prob=0.5):
-        op = 0
-        max_set = set()
-        nodes = list(G.nodes)
-        
-        # Count the number of operations for sorting the nodes (if it's necessary)
-        op += math.ceil(len(nodes) * math.log2(len(nodes))) if len(nodes) > 1 else 0
-
-        excluded_nodes = set()  # Set to track nodes that are no longer eligible
-
-        while nodes:
-            # Create the list of eligible nodes
-            eligible_nodes = [n for n in nodes if n not in excluded_nodes]
-            if not eligible_nodes:
-                break  # Exit the loop if there are no eligible nodes left
-
-            # Flip the coin with the given probability
-            if random.random() < coin_prob:
-                # Select a node randomly from the eligible nodes
-                node = random.choice(eligible_nodes)
-                op += 1  # Operation for selecting a random node
-            else:
-                # Heuristic-based selection: node with the highest weight-to-degree ratio
-                node = max(
-                    eligible_nodes,
-                    key=lambda x: G.nodes[x]['weight'] / G.degree(x) if G.degree(x) != 0 else float('inf')
-                )
-                op += 2  # Operation for selecting using the heuristic
-            
-            # Add the selected node to the result set
-            max_set.add(node)
-            
-            # Exclude the current node and its neighbors from future consideration
-            excluded_nodes.add(node)
-            excluded_nodes.update(G.neighbors(node))
-            
-            # Remove the selected node from the list of available nodes
-            nodes.remove(node)
-
-        return max_set, op
 
     @staticmethod
-    def compare_precision(func, p, n, print_results=False, iterations=1, func_iterations=1000, restart_prob=0.1):
-        """Compares the precision of a given function against the exhaustive (v2) algorithm."""
-        """If the function is randomized, it will run multiple iterations to calculate the average precision."""
-        
+    def simulated_annealing(G, iterations=1000, initial_temp=100, cooling_rate=0.99):
+        """
+        Simulated Annealing algorithm to solve the MWIS problem.
+
+        Args:
+            G: A graph with weights on nodes.
+            iterations: Number of iterations for refinement.
+            initial_temp: Initial temperature for the annealing process.
+            cooling_rate: Rate at which the temperature cools down.
+
+        Returns:
+            A tuple of the best independent set found and the operation count.
+        """
+        def calculate_weight(independent_set):
+            """Helper function to calculate the weight of an independent set."""
+            return sum(G.nodes[node]['weight'] for node in independent_set)
+
+        def get_neighbors(solution):
+            """
+            Generate neighbors by attempting to add or remove nodes while
+            maintaining independence.
+            """
+            neighbors = []
+            for node in G.nodes:
+                if node not in solution and all(n not in solution for n in G.neighbors(node)):
+                    # Add a valid node
+                    neighbor = solution | {node}
+                    neighbors.append(neighbor)
+                elif node in solution:
+                    # Remove a node
+                    neighbor = solution - {node}
+                    neighbors.append(neighbor)
+            return neighbors
+
+        # Initialize with a random independent set
+        current_set = set()
+        for node in G.nodes:
+            if all(n not in current_set for n in G.neighbors(node)):
+                current_set.add(node)
+
+        current_weight = calculate_weight(current_set)
+        best_set = current_set
+        best_weight = current_weight
+
+        ops = 0  # Operation count
+        temp = initial_temp
+
+        for _ in range(iterations):
+            ops += 1  # Increment for each iteration
+
+            # Generate a random neighbor
+            neighbors = get_neighbors(current_set)
+            if not neighbors:
+                break  # No valid neighbors
+
+            new_set = random.choice(neighbors)
+            new_weight = calculate_weight(new_set)
+
+            # Decide whether to accept the new solution
+            if new_weight > current_weight or random.random() < math.exp((new_weight - current_weight) / temp):
+                current_set = new_set
+                current_weight = new_weight
+                ops += 1  # Increment for accepting a solution
+
+            # Update the best solution if needed
+            if current_weight > best_weight:
+                best_set = current_set
+                best_weight = current_weight
+                ops += 1  # Increment for updating the best solution
+
+            # Cool down the temperature
+            temp *= cooling_rate
+
+        return best_set, ops
+
+
+    @staticmethod
+    def compare_precision(func, p, n, print_results=False, iterations=1, func_iterations=1000, initial_temp=100, cooling_rate=0.99):
+        """
+        Compares the precision of a given function against the exhaustive (v2) algorithm.
+        If the function is randomized, it will run multiple iterations to calculate the average precision.
+
+        Args:
+            func: The algorithm to test.
+            p: Probability for edge creation in graph generation.
+            n: Maximum number of nodes for testing graphs.
+            print_results: Whether to print detailed results for each graph.
+            iterations: Number of runs per graph for randomized algorithms.
+            func_iterations: Iterations for the algorithm being tested.
+            initial_temp: Initial temperature for simulated annealing (if applicable).
+            cooling_rate: Cooling rate for simulated annealing (if applicable).
+
+        Returns:
+            The precision percentage.
+        """
         matches = 0
+        total_tests = 0
         start_time = time.time()  # Start timing the process
-        
-        if iterations > 1:
-            # Run multiple iterations of the randomized algorithm
-            for _ in tqdm(range(iterations), desc="Testing graphs", unit="iteration"):
-                for i in range(1, n + 1):
-                    # Generate graph with i nodes and edge probability p
-                    G = utils.create_graph_v4(i, p)
-                    
-                    # Run the exhaustive (v2) algorithm
-                    result_exhaustive, _ = algorithms.exhaustive_v2(G)
-                    
-                    # Run the function to test
-                    result_func, _ = func(G, func_iterations, restart_prob)
-                    
-                    if print_results:
-                        print(f"Graph with {i} nodes:")
-                        print("Exhaustive algorithm:", result_exhaustive)
-                        print("Function result:", result_func)
-                        print()
-                    
-                    # Check if the results match
-                    if result_exhaustive == result_func:
-                        matches += 1
-        else:
-            for i in tqdm(range(1, n + 1), desc="Testing graphs", unit="graph"):
-                # Generate graph with i nodes and edge probability p
-                G = utils.create_graph_v4(i, p)
-                
-                # Run the exhaustive (v2) algorithm
-                result_exhaustive, _ = algorithms.exhaustive_v2(G)
-                
-                # Run the function to test
-                result_func, _ = func(G)
 
+        for i in tqdm(range(1, n + 1), desc="Testing graphs", unit="graph"):
+            # Generate graph with i nodes and edge probability p
+            G = utils.create_graph_v4(i, p)
+
+            # Run the exhaustive (v2) algorithm to get the ground truth
+            result_exhaustive, _ = algorithms.exhaustive_v2(G)
+
+            for _ in range(iterations):
+                total_tests += 1
+
+                # Run the function to test
+                if func == algorithms.simulated_annealing:
+                    result_func, _ = func(G, func_iterations, initial_temp, cooling_rate)
+                elif func == algorithms.monte_carlo or func == algorithms.heuristic_monte_carlo:
+                    result_func, _ = func(G, func_iterations)
+                else:
+                    result_func, _ = func(G)
+
+                # Optionally print results
                 if print_results:
-                    print(f"Graph with {i} nodes:")
+                    print(f"Graph with {i} nodes (Iteration {_+1}/{iterations}):")
                     print("Exhaustive algorithm:", result_exhaustive)
                     print("Function result:", result_func)
                     print()
-                
+
                 # Check if the results match
                 if result_exhaustive == result_func:
                     matches += 1
-        
+
         # Calculate the precision as a percentage
-        precision = (matches / (n * iterations)) * 100
+        precision = (matches / total_tests) * 100
         elapsed_time = time.time() - start_time  # Calculate total time taken
-        
+
         print(f"Total time taken: {elapsed_time:.2f} seconds")
         return precision
+    
+    @staticmethod
+    def tune_parameters(func, p, n, trials=10, func_iterations=1000):
+        """
+        Tune the initial temperature and cooling rate for the given function.
+
+        Args:
+            func: The algorithm to test (e.g., simulated_annealing).
+            p: Probability for edge creation in graph generation.
+            n: Maximum number of nodes for testing graphs.
+            trials: Number of graphs to test for each configuration.
+            func_iterations: Number of iterations for the algorithm.
+
+        Returns:
+            A dictionary with the best configuration and its precision.
+        """
+        best_precision = 0
+        best_params = None
+
+        # Parameter ranges for tuning
+        initial_temps = [10, 50, 100, 500, 1000]
+        cooling_rates = [0.90, 0.92, 0.94, 0.96, 0.98, 0.99]
+
+        # Create the directory if it doesn't exist
+        results_dir = "../data/sa_tests"
+        os.makedirs(results_dir, exist_ok=True)
+
+        # Prepare CSV file
+        file_path = os.path.join(results_dir, f"sa_results_n{n}_k{p}.csv")
+
+        # Initialize CSV file with headers
+        if not os.path.exists(file_path):
+            with open(file_path, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(['initial_temp', 'cooling_rate', 'precision'])
+
+        # Run parameter tuning
+        for initial_temp in initial_temps:
+            for cooling_rate in cooling_rates:
+                print(f"Testing configuration: initial_temp={initial_temp}, cooling_rate={cooling_rate}")
+                
+                # Run precision tests for the current configuration
+                precision = algorithms.compare_precision(
+                    func=func,
+                    p=p,
+                    n=n,
+                    print_results=False,
+                    iterations=trials,
+                    func_iterations=func_iterations,
+                    initial_temp=initial_temp,
+                    cooling_rate=cooling_rate
+                )
+
+                print(f"Precision: {precision:.2f}% for initial_temp={initial_temp}, cooling_rate={cooling_rate}")
+
+                # Update the best configuration if needed
+                if precision > best_precision:
+                    best_precision = precision
+                    best_params = {'initial_temp': initial_temp, 'cooling_rate': cooling_rate}
+
+                # Save the current configuration and precision to CSV
+                with open(file_path, mode='a', newline='') as file:
+                    writer = csv.writer(file)
+                    writer.writerow([initial_temp, cooling_rate, precision])
+
+        return {'best_params': best_params, 'best_precision': best_precision}

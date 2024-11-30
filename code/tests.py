@@ -46,19 +46,30 @@ def full_test_with_iterations():
     #utils.full_stress_test(algorithms.monte_carlo_with_filter, base_filename="monte_carlo_with_filter_compare", n_max=800, stored_graphs=False, sample_size=1, iterations=[25, 50, 100, 250, 500, 750, 1000])
     utils.full_stress_test(algorithms.heuristic_monte_carlo, base_filename="heuristic_monte_carlo_compare", stored_graphs=True, sample_size=1, iterations=[25, 50, 100, 250, 500, 750, 1000])
     
-def quick_precision_test(name, algorithm, k, n, iterations=0):
+def quick_precision_test(name, algorithm, k, n, iterations=1000, initial_temp=100, cooling_rate=0.99, trials=1):
     """ Quick test to check the precision of an algorithm """
     print(f"Testing {name}'s precision")
-    precision = algorithms.compare_precision(algorithm, k, n, iterations=iterations)
-    print(precision)
+    precision = algorithms.compare_precision(algorithm, k, n, func_iterations=iterations, initial_temp=initial_temp, cooling_rate=cooling_rate, iterations=trials)
     print(f"Precision: {precision}")
     
 def main():
     """ Main function """
-    #quick_precision_test("Monte Carlo", algorithms.monte_carlo, 0.75, 100, 20)
+    #quick_precision_test("Monte Carlo", algorithms.monte_carlo, 0.75, 100, 250)
+    #quick_precision_test("Simulated Annealing", algorithms.simulated_annealing, 0.75, 50, 1000, 1000, 0.99, 10)
+
+
+    # Simulated Annealing Tuning
+    n = 50
+    iterations = 500
+    for k in [0.125, 0.25, 0.50, 0.75]:
+        best_data = algorithms.tune_parameters(algorithms.simulated_annealing, k, n, iterations)
+        print(f"Simulated Annealing Tuning for k={k}, n={n}, iterations={iterations}")
+        print(f"Best Parameters: {best_data['best_params']}")
+        print(f"Best Precision: {best_data['best_precision']}")
+
     #graph_creation()
     #full_test()
-    full_test_with_iterations()
+    #full_test_with_iterations()
     
 if __name__ == "__main__":
     main()
