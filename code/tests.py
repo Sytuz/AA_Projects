@@ -7,10 +7,18 @@ from algorithms import algorithms
 def graph_creation():
     """ Pre-generated graphs """
     """ ATTENTION: This function will take a long time to run, and occupy approximately 1.5GB of disk space """
-    utils.graph_creation_and_save(3500, 0.125, 100)
-    utils.graph_creation_and_save(3500, 0.25, 100)
-    utils.graph_creation_and_save(3500, 0.50, 100)
-    utils.graph_creation_and_save(3500, 0.75, 100)
+    
+    # Big Graphs for Greedy Algorithms
+    # utils.graph_creation_and_save(3500, 0.125, 100)
+    # utils.graph_creation_and_save(3500, 0.25, 100)
+    # utils.graph_creation_and_save(3500, 0.50, 100)
+    # utils.graph_creation_and_save(3500, 0.75, 100)
+    
+    # Smaller Graphs for Comparing With Exhaustive
+    utils.graph_creation_and_save(500, 0.125, 1, file_name="small_graphs")
+    utils.graph_creation_and_save(500, 0.25, 1, file_name="small_graphs")
+    utils.graph_creation_and_save(500, 0.50, 1, file_name="small_graphs")
+    utils.graph_creation_and_save(500, 0.75, 1, file_name="small_graphs")
 
 def full_test():
     """ Full test of all algorithms """
@@ -34,7 +42,9 @@ def full_test_with_iterations():
     """ Full test for algorithms that require iterations (randomized algorithms) """
     
     # Standard Randomized, Smaller For Comparing With Exhaustive
-    utils.full_stress_test(algorithms.monte_carlo, base_filename="monte_carlo_compare", n_max=800, stored_graphs=False, sample_size=1, iterations=[25, 50, 100, 250, 500, 750, 1000])
+    #utils.full_stress_test(algorithms.monte_carlo, base_filename="monte_carlo_compare", n_max=800, stored_graphs=False, sample_size=1, iterations=[25, 50, 100, 250, 500, 750, 1000])
+    #utils.full_stress_test(algorithms.monte_carlo_with_filter, base_filename="monte_carlo_with_filter_compare", n_max=800, stored_graphs=False, sample_size=1, iterations=[25, 50, 100, 250, 500, 750, 1000])
+    utils.full_stress_test(algorithms.heuristic_monte_carlo, base_filename="heuristic_monte_carlo_compare", stored_graphs=True, sample_size=1, iterations=[25, 50, 100, 250, 500, 750, 1000])
     
 def quick_precision_test(name, algorithm, k, n, iterations=0):
     """ Quick test to check the precision of an algorithm """

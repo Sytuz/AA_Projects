@@ -143,44 +143,6 @@ class algorithms:
         return max_set, op
     
     @staticmethod
-    # Improved greedy algorithm to find the maximum weight independent set
-    # From: https://drops.dagstuhl.de/storage/00lipics/lipics-vol244-esa2022/LIPIcs.ESA.2022.45/LIPIcs.ESA.2022.45.pdf
-    def article_greedy(G):
-        # Get the adjacency list of the graph
-        graph = {node: list(neighbors) for node, neighbors in G.adj.items()}
-
-        # Get the weight of each node
-        weights = nx.get_node_attributes(G, 'weight')
-
-        # Maximum time allowed for the algorithm
-        max_time = 1
-
-        # Create an instance of the MWIS class
-        mwis = MWIS(graph, weights, max_time)
-
-        # Run the algorithm
-        mwis.run()
-
-        # Return the best solution found
-        return mwis.best_solution, mwis.best_weight
-    
-    @staticmethod
-    # Completely random algorithm to find the maximum weight independent set
-    # Randomly selects nodes until no more nodes can be added
-    def completely_random(G):
-        op = 0
-        max_set = set()
-        nodes = list(G.nodes)
-        while nodes:
-            node = random.choice(nodes)
-            op += 1
-        
-            if utils.is_independent_set(G, max_set.union({node})):
-                max_set.add(node)
-            nodes.remove(node)
-        return max_set, op
-    
-    @staticmethod
     def monte_carlo(G, iterations=1000):
         """
         Randomized algorithm to find a near-optimal maximum weight independent set.
@@ -233,7 +195,7 @@ class algorithms:
         return best_set, ops
 
     @staticmethod
-    def monte_carlo_with_filter(G, iterations=1000, hash_size=100000):
+    def monte_carlo_with_filter(G, iterations=1000, hash_size=None):
         """
         Monte Carlo algorithm with a mechanism to avoid repeating the same node orders.
 
@@ -247,6 +209,11 @@ class algorithms:
         """
         best_set = set()
         best_weight = 0
+        
+        ops = 0  # Initialize operation count
+        
+        if hash_size is None:
+            hash_size = iterations
 
         # Initialize a set to store hashes of processed node orders
         processed_hashes = set()
@@ -260,6 +227,7 @@ class algorithms:
             nodes_hash = hashlib.md5(str(nodes).encode()).hexdigest()
 
             # Check if this order has already been processed
+            ops += 1  # Increment for checking if the node order has been processed
             if nodes_hash in processed_hashes:
                 continue  # Skip this iteration to avoid duplication
 
@@ -274,19 +242,88 @@ class algorithms:
             excluded_nodes = set()
 
             for node in nodes:
+                ops += 1  # Increment for checking if node is excluded
                 if node in excluded_nodes:
                     continue
+
                 current_set.add(node)
+                ops += 1  # Increment for adding a node to the independent set
+
                 current_weight += G.nodes[node]['weight']
+                ops += 1  # Increment for updating current weight
+
                 excluded_nodes.add(node)
+                ops += 1  # Increment for adding a node to the excluded set
+
                 excluded_nodes.update(G.neighbors(node))
+                ops += len(list(G.neighbors(node)))  # Increment for updating neighbors
 
             # Update the best set if the current set is better
             if current_weight > best_weight:
                 best_set = current_set
                 best_weight = current_weight
+                ops += 1  # Increment for updating the best solution
 
-        return best_set, _
+        return best_set, ops
+    
+    def heuristic_monte_carlo(G, iterations=1000):
+        """
+        Randomized algorithm to find a near-optimal maximum weight independent set.
+        Combines randomness with the weighted-to-degree heuristic.
+
+        Args:
+            G: A graph with weights on nodes.
+            iterations: Number of iterations for refinement.
+
+        Returns:
+            A tuple of the maximum independent set found and the operation count.
+        """
+        best_set = set()
+        best_weight = 0
+        ops = 0
+
+        nodes = list(G.nodes)
+        # Separate isolated nodes
+        isolated_nodes = {node for node in nodes if G.degree(node) == 0}
+        weight_degree_ratio = [
+            (node, G.nodes[node]['weight'] / G.degree(node))
+            for node in nodes if G.degree(node) > 0
+        ]
+        
+        if not weight_degree_ratio:  # Handle edge case where all nodes are isolated
+            return isolated_nodes, 1
+
+        total_ratio = sum(ratio for _, ratio in weight_degree_ratio)
+        if total_ratio <= 0 or not math.isfinite(total_ratio):
+            raise ValueError("Total ratio must be positive and finite")
+
+        probabilities = [ratio / total_ratio for _, ratio in weight_degree_ratio]
+
+        for _ in range(iterations):
+            current_set = set(isolated_nodes)  # Start with isolated nodes
+            current_weight = sum(G.nodes[node]['weight'] for node in isolated_nodes)
+            
+            # Shuffle nodes based on the calculated probabilities
+            shuffled_nodes = random.choices([node for node, _ in weight_degree_ratio], weights=probabilities, k=len(weight_degree_ratio))
+            excluded_nodes = set()
+
+            for node in shuffled_nodes:
+                ops += 1
+                if node in excluded_nodes:
+                    continue
+
+                current_set.add(node)
+                current_weight += G.nodes[node]['weight']
+                excluded_nodes.add(node)
+                excluded_nodes.update(G.neighbors(node))
+                ops += len(list(G.neighbors(node)))
+
+            if current_weight > best_weight:
+                best_set = current_set
+                best_weight = current_weight
+                ops += 1
+
+        return best_set, ops
     
     @staticmethod
     # Greedy algorithm with random selection factor

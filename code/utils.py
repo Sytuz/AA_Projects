@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
 import networkx as nx
+from tqdm import tqdm
 import pandas as pd
 import numpy as np
 import itertools
+import threading
 import random
 import pickle
 import time
@@ -26,8 +28,21 @@ class utils:
         return G
 
     @staticmethod
-    # Function to create and save graphs to a file
     def graph_creation_and_save(n, p, step, output_dir='../graphs', file_name='graphs', max_workers=2):
+        """
+        Function to create and save graphs to a file, with progress tracking using tqdm.
+
+        Args:
+            n (int): Maximum size of graphs.
+            p (float): Edge probability.
+            step (int): Step size for graph increments.
+            output_dir (str): Directory to save the graphs.
+            file_name (str): Base file name for saving.
+            max_workers (int): Number of workers (not used here but included for future expansion).
+
+        Returns:
+            str: Path to the output file.
+        """
         # Ensure the output directory exists
         os.makedirs(output_dir, exist_ok=True)
         
@@ -40,28 +55,18 @@ class utils:
         # Create a dictionary to store the graphs
         graph_data = {}
         
-        # Generate graphs
-        for size in sizes:
-            print(f"Generating graph for size {size}...")
-            graph_data[size] = utils.create_graph_v4(size, p)
+        # Generate graphs with tqdm progress bar
+        print("Starting graph generation...")
+        with tqdm(total=len(sizes), desc=f"Generating Graphs for k={p}", unit="graph") as pbar:
+            for size in sizes:
+                graph_data[size] = utils.create_graph_v4(size, p)
+                pbar.update(1)  # Update the progress bar after each iteration
 
         # Save all the graphs to a file (overwrite the file)
         with open(output_filename, 'wb') as f:
             pickle.dump(graph_data, f)
-
-        print("All graphs generated and saved.")
-
-        # Final save to include any remaining unsaved data
-        with open(output_filename, 'wb') as f:
-            pickle.dump(dict(graph_data), f)
-        print("All graphs generated and saved.")
-
-
-        # Final save after the loop completes
-        with open(output_filename, 'wb') as f:
-            pickle.dump(graph_data, f)
-        print("Final save completed.")
         
+        print("All graphs generated and saved.")
         return output_filename
 
     @staticmethod
@@ -96,19 +101,11 @@ class utils:
         print()
 
     @staticmethod
-    # Function to stress test a function for a single p value
-    # - func: the function to test
-    # - p: the edge probability
-    # - max_time_minutes: the maximum time allowed for a single test
-    # - filename: the name of the CSV file to save the results
-    # - save_results: whether to save the results to a CSV file
-    # - n_max: the maximum number of nodes a test graph can have
-    # - sample_size: the number of nodes to increment by in each iteration
-    # - stored_graphs: whether to use pre-generated graphs
     def stress_test(func, p, max_time_minutes, filename="stress_test_results.csv", save_results=True, n_max=1000, sample_size=5, stored_graphs=True, iterations=None):
         """Runs a stress test for a single p value and optionally saves the results to a specified CSV file."""
+        
         max_time_seconds = max_time_minutes * 60
-        stored_graphs_filename = f"../graphs/graphs_p_{p}.pkl"
+        stored_graphs_filename = f"../graphs/graphs_p_{p}.pkl" if "compare" not in filename else f"../graphs/small_graphs_p_{p}.pkl"
         graphs = None
         if stored_graphs:
             graphs = list(utils.load_graphs(stored_graphs_filename).values())
@@ -137,21 +134,36 @@ class utils:
                 G = utils.create_graph_v4(n, p)
             
             # Measure the time taken by the function on the generated graph
-            start = time.time()
-            if iterations is not None:
-                result, op = func(G, iterations=iterations)
-            else:
-                result, op = func(G)
-            end = time.time()
-            
-            # Calculate elapsed time
-            elapsed_time = end - start
+            result_container = {}
+            elapsed_time = 0
 
-            # Calculate the total weight of the MWIS set
+            def run_func():
+                """Wrapper function to execute and store the results."""
+                if iterations is not None:
+                    result_container['result'], result_container['op'] = func(G, iterations=iterations)
+                else:
+                    result_container['result'], result_container['op'] = func(G)
+
+            # Create a thread to run the function
+            thread = threading.Thread(target=run_func)
+            start = time.time()
+            thread.start()
+            thread.join(timeout=max_time_seconds)
+            end = time.time()
+
+            # Check if the thread finished
+            if thread.is_alive():
+                print(f"Execution for n = {n} exceeded the time limit of {max_time_minutes} minutes. Stopping stress test.")
+                thread.join()  # Ensure thread is cleaned up
+                break
+            else:
+                elapsed_time = end - start
+
+            # Calculate results
+            result = result_container.get('result', set())
+            op = result_container.get('op', 0)
             total_weight = sum(G.nodes[node]['weight'] for node in result)
             solution_size = len(result)
-
-            # Convert the set to a string
             result_str = str(result)
             
             # Write results to CSV if saving is enabled
@@ -161,17 +173,13 @@ class utils:
             # Print the result for the current size
             print(f"{n:4} | {op:16} | {total_weight:12} | {elapsed_time:8.6f} | {solution_size:13} | {result_str} ")
             
-            # Stop if the elapsed time exceeds the maximum allowed time
-            if elapsed_time > max_time_seconds:
-                print(f"Maximum time exceeded for p = {p}. Stopping stress test.")
-                break
-            
             # Increment node count for next iteration
             n += sample_size
 
         # Close the file if it was opened
         if file:
             file.close()
+
 
     @staticmethod
     def full_stress_test(func, p_values=[0.125, 0.25, 0.5, 0.75], max_time_minutes=2, 
