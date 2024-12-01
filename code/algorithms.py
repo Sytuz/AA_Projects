@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Pool, cpu_count
 from utils import utils
 import networkx as nx
 from tqdm import tqdm
@@ -332,6 +334,96 @@ class algorithms:
 
         return best_set, ops
 
+    @staticmethod
+    def heuristic_monte_carlo_worker_thread(G, isolated_nodes, weight_degree_ratio, probabilities, iterations):
+        """
+        Worker function for thread-based Heuristic Monte Carlo with batched iterations.
+        """
+        best_set = set()
+        best_weight = 0
+        ops = 0
+
+        for _ in range(iterations):
+            current_set = set(isolated_nodes)
+            current_weight = sum(G.nodes[node]['weight'] for node in isolated_nodes)
+
+            shuffled_nodes = random.choices(
+                [node for node, _ in weight_degree_ratio],
+                weights=probabilities,
+                k=len(weight_degree_ratio)
+            )
+            excluded_nodes = set()
+
+            for node in shuffled_nodes:
+                ops += 1
+                if node in excluded_nodes:
+                    continue
+
+                current_set.add(node)
+                current_weight += G.nodes[node]['weight']
+                excluded_nodes.add(node)
+                excluded_nodes.update(G.neighbors(node))
+                ops += len(list(G.neighbors(node)))
+
+            if current_weight > best_weight:
+                best_set = current_set
+                best_weight = current_weight
+
+        return best_set, best_weight, ops
+
+    @staticmethod
+    def threaded_heuristic_monte_carlo(G, iterations=1000):
+        """
+        Thread-based parallel version of Heuristic Monte Carlo to find a near-optimal MWIS.
+        
+        Args:
+            G: A graph with weights on nodes.
+            iterations: Number of iterations for refinement.
+
+        Returns:
+            A tuple of the maximum independent set found and the operation count.
+        """
+        isolated_nodes = {node for node in G.nodes if G.degree(node) == 0}
+        weight_degree_ratio = [
+            (node, G.nodes[node]['weight'] / G.degree(node))
+            for node in G.nodes if G.degree(node) > 0
+        ]
+        
+        if not weight_degree_ratio:
+            return isolated_nodes, 1
+
+        total_ratio = sum(ratio for _, ratio in weight_degree_ratio)
+        probabilities = [ratio / total_ratio for _, ratio in weight_degree_ratio]
+
+        # Determine thread pool size and iterations per thread
+        max_threads = min(8, iterations)  # Limit to 8 threads or fewer
+        iterations_per_thread = max(1, iterations // max_threads)
+
+        # Prepare worker arguments
+        worker_args = [
+            (G, isolated_nodes, weight_degree_ratio, probabilities, iterations_per_thread)
+            for _ in range(max_threads)
+        ]
+
+        best_set = set()
+        best_weight = 0
+        total_ops = 0
+
+        # Run workers in a thread pool
+        with ThreadPoolExecutor(max_threads) as executor:
+            results = executor.map(
+                lambda args: algorithms.heuristic_monte_carlo_worker_thread(*args),
+                worker_args
+            )
+
+        # Combine results
+        for current_set, current_weight, ops in results:
+            total_ops += ops
+            if current_weight > best_weight:
+                best_set = current_set
+                best_weight = current_weight
+
+        return best_set, total_ops
 
     @staticmethod
     def compare_precision(func, p, n, print_results=False, iterations=1, func_iterations=1000, initial_temp=100, cooling_rate=0.99):
@@ -369,7 +461,7 @@ class algorithms:
                 # Run the function to test
                 if func == algorithms.simulated_annealing:
                     result_func, _ = func(G, func_iterations, initial_temp, cooling_rate)
-                elif func == algorithms.monte_carlo or func == algorithms.heuristic_monte_carlo:
+                elif func == algorithms.monte_carlo or func == algorithms.heuristic_monte_carlo or func == algorithms.threaded_heuristic_monte_carlo:
                     result_func, _ = func(G, func_iterations)
                 else:
                     result_func, _ = func(G)
