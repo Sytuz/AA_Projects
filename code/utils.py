@@ -7,6 +7,7 @@ import itertools
 import threading
 import random
 import pickle
+import json
 import time
 import csv
 import os
@@ -28,26 +29,29 @@ class utils:
         return G
 
     @staticmethod
-    def graph_creation_and_save(n, p, step, output_dir='../graphs', file_name='graphs', max_workers=2):
+    def graph_creation(n, k, step, save_data=None):
         """
         Function to create and save graphs to a file, with progress tracking using tqdm.
 
         Args:
             n (int): Maximum size of graphs.
-            p (float): Edge probability.
+            k (float): Edge probability.
             step (int): Step size for graph increments.
             output_dir (str): Directory to save the graphs.
-            file_name (str): Base file name for saving.
-            max_workers (int): Number of workers (not used here but included for future expansion).
+            save_data (Dict): Dictionary with output directory and file name.
+            |  output_dir (str): Directory to save the graphs.
+            |  file_name (str): Base name for the output files.
 
         Returns:
             str: Path to the output file.
         """
-        # Ensure the output directory exists
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # File to store all graphs for the given p
-        output_filename = os.path.join(output_dir, f"{file_name}_p_{p}.pkl")
+
+        if save_data:
+            # Ensure the output directory exists
+            os.makedirs(save_data['output_dir'], exist_ok=True)
+            
+            # File to store all graphs for the given k
+            output_filename = os.path.join(save_data['output_dir'], f"{save_data['file_name']}_k_{k}.pkl")
         
         # Define sizes from 0 to n, in increments of step
         sizes = range(step, n + 1, step)
@@ -57,26 +61,40 @@ class utils:
         
         # Generate graphs with tqdm progress bar
         print("Starting graph generation...")
-        with tqdm(total=len(sizes), desc=f"Generating Graphs for k={p}", unit="graph") as pbar:
+        with tqdm(total=len(sizes), desc=f"Generating Graphs for k={k}", unit="graph") as pbar:
             for size in sizes:
-                graph_data[size] = utils.create_graph_v4(size, p)
+                graph_data[size] = utils.create_graph_v4(size, k)
                 pbar.update(1)  # Update the progress bar after each iteration
 
-        # Save all the graphs to a file (overwrite the file)
-        with open(output_filename, 'wb') as f:
-            pickle.dump(graph_data, f)
+        if save_data:
+            # Save all the graphs to a file (overwrite the file)
+            with open(output_filename, 'wb') as f:
+                pickle.dump(graph_data, f)
+            
+            print("All graphs generated and saved.")
+            return output_filename
         
-        print("All graphs generated and saved.")
-        return output_filename
+        print("All graphs generated.")
+        return graph_data
 
     @staticmethod
-    # Function to load graphs from a file
     def load_graphs(filename):
-        # Load all graphs from a single file
-        with open(filename, 'rb') as f:
-            graphs = pickle.load(f)
-        return graphs
+        """
+        Load graphs from a JSONL file.
 
+        Args:
+            filename (str): Path to the JSONL file.
+
+        Returns:
+            List of graph data (as dictionaries).
+        """
+        graph_data = []
+        with open(filename, 'r', encoding='utf-8') as f:
+            for line in f:
+                graph_data.append(json.loads(line.strip()))
+        return graph_data
+
+    
     @staticmethod
     # Function to generate all subsets of a given set
     def all_subsets(s):
@@ -99,166 +117,6 @@ class utils:
         for node in data:
             print(node[0], "   |", node[1]['weight'])
         print()
-
-    @staticmethod
-    def stress_test(func, p, max_time_minutes, filename="stress_test_results.csv", save_results=True, n_max=1000, sample_size=5, stored_graphs=True, iterations=None):
-        """Runs a stress test for a single p value and optionally saves the results to a specified CSV file."""
-        
-        max_time_seconds = max_time_minutes * 60
-        stored_graphs_filename = f"../graphs/graphs_p_{p}.pkl" if "compare" not in filename else f"../graphs/small_graphs_p_{p}.pkl"
-        graphs = None
-        if stored_graphs:
-            graphs = list(utils.load_graphs(stored_graphs_filename).values())
-            n_max = len(graphs) * sample_size
-
-        # If save_results is True, open the file for writing
-        if save_results:
-            filename = f"../data/{filename}"
-            file = open(filename, mode='w', newline='')
-            writer = csv.writer(file)
-            # Write CSV header
-            writer.writerow(["Node Count", "Number of Operations", "Total Weight", "Execution Time (seconds)", "Solution Size", "Solution"])
-        else:
-            file = None
-            writer = None
-
-        print("  n  | No of Operations | Total Weight | Time (s) | Solution Size | Solution ")
-        
-        # Stress test loop
-        n = sample_size
-        while n <= n_max:
-            if stored_graphs:
-                G = graphs[n // sample_size - 1]
-            else:
-                # Generate graph with n nodes and edge probability p
-                G = utils.create_graph_v4(n, p)
-            
-            # Measure the time taken by the function on the generated graph
-            result_container = {}
-            elapsed_time = 0
-
-            def run_func():
-                """Wrapper function to execute and store the results."""
-                if iterations is not None:
-                    result_container['result'], result_container['op'] = func(G, iterations=iterations)
-                else:
-                    result_container['result'], result_container['op'] = func(G)
-
-            # Create a thread to run the function
-            thread = threading.Thread(target=run_func)
-            start = time.time()
-            thread.start()
-            thread.join(timeout=max_time_seconds)
-            end = time.time()
-
-            # Check if the thread finished
-            if thread.is_alive():
-                print(f"Execution for n = {n} exceeded the time limit of {max_time_minutes} minutes. Stopping stress test.")
-                thread.join()  # Ensure thread is cleaned up
-                break
-            else:
-                elapsed_time = end - start
-
-            # Calculate results
-            result = result_container.get('result', set())
-            op = result_container.get('op', 0)
-            total_weight = sum(G.nodes[node]['weight'] for node in result)
-            solution_size = len(result)
-            result_str = str(result)
-            
-            # Write results to CSV if saving is enabled
-            if save_results:
-                writer.writerow([n, op, total_weight, elapsed_time, solution_size, result_str])
-            
-            # Print the result for the current size
-            print(f"{n:4} | {op:16} | {total_weight:12} | {elapsed_time:8.6f} | {solution_size:13} | {result_str} ")
-            
-            # Increment node count for next iteration
-            n += sample_size
-
-        # Close the file if it was opened
-        if file:
-            file.close()
-
-
-    @staticmethod
-    def full_stress_test(func, p_values=[0.125, 0.25, 0.5, 0.75], max_time_minutes=2, 
-                        base_filename="full_stress_test_results", save_results=True, 
-                        n_max=1000, sample_size=5, stored_graphs=True, 
-                        iterations=None):
-        """
-        Runs stress tests for a function across multiple p values and optionally iterations.
-        Results are saved in a structured directory format.
-
-        Args:
-            func: The function to test.
-            p_values: A list of edge probabilities to test.
-            max_time_minutes: Maximum time allowed for a single test.
-            base_filename: Base name for the results directory.
-            save_results: Whether to save the results to CSV files.
-            n_max: Maximum number of nodes in a test graph.
-            sample_size: Increment size for nodes in each test.
-            stored_graphs: Whether to use pre-generated graphs.
-            max_iterations: Maximum iterations for algorithms that require them (optional).
-            iteration_step: Incremental step for iterations (required if max_iterations is given).
-        """
-
-        # Base directory for all results
-        base_folder = f"../data/{base_filename}"
-        
-        if save_results:
-            # Clean up and recreate the base folder
-            if os.path.exists(base_folder):
-                for item in os.listdir(base_folder):
-                    item_path = os.path.join(base_folder, item)
-                    if os.path.isfile(item_path):
-                        os.remove(item_path)
-                    elif os.path.isdir(item_path):
-                        for sub_item in os.listdir(item_path):
-                            sub_item_path = os.path.join(item_path, sub_item)
-                            if os.path.isfile(sub_item_path):
-                                os.remove(sub_item_path)
-                        os.rmdir(item_path)
-
-            else:
-                os.makedirs(base_folder)
-        
-        # Loop over each edge probability (p value)
-        for p in p_values:
-            print(f"Starting stress tests for p = {p}")
-
-            # Create a folder for the current p value
-            p_folder = os.path.join(base_folder, f"p_{int(p * 1000) if p == 0.125 else int(p * 100)}")
-            os.makedirs(p_folder, exist_ok=True)
-
-            if iterations is not None:
-                # Iteration-based testing
-                for iteration_count in iterations:
-                    print(f"  Testing with {iteration_count} iterations...")
-
-                    # Generate a unique filename for this test
-                    filename = os.path.join(p_folder, f"results_{iteration_count}.csv")
-
-                    # Run the stress test and save results
-                    utils.stress_test(
-                        func, p, max_time_minutes, filename=filename,
-                        save_results=save_results, n_max=n_max,
-                        sample_size=sample_size, stored_graphs=stored_graphs,
-                        iterations=iteration_count
-                    )
-            else:                
-                # Generate a unique filename for this test
-                filename = os.path.join(p_folder, "results.csv")
-
-                # Run the stress test and save results
-                utils.stress_test(
-                    func, p, max_time_minutes, filename=filename,
-                    save_results=save_results, n_max=n_max,
-                    sample_size=sample_size, stored_graphs=stored_graphs
-                )
-            
-            print(f"Completed stress tests for p = {p}.\n")
-
 
     @staticmethod
     def visualize_solution(G, mwis_set, store_png=False):
@@ -418,3 +276,75 @@ class utils:
         plt.tight_layout()
         plt.savefig(f'../images/deviation_standard_deviation_k_{k_value}.png', dpi=300)
         plt.show()
+
+    @staticmethod
+    def create_graph_jsonl(file_path='../graphs/test_graph.txt', graph_name="test_graph"):
+        """
+        Reads a graph from a text file and returns a JSONL line representation
+        with adjacency matrix, node weights, and graph name.
+
+        Args:
+            file_path (str): Path to the input text file.
+            graph_name (str): Name of the graph.
+
+        Returns:
+            str: A JSON-formatted string representing the graph in JSONL format.
+        """
+        with open(file_path, 'r') as f:
+            # Read the file and split into lines
+            lines = f.readlines()
+            
+            # Parse number of nodes and edges
+            num_nodes = int(lines[0].strip())
+            num_edges = int(lines[1].strip())
+            
+            # Parse the adjacency matrix
+            adjacency_matrix = []
+            for line in lines[2:]:
+                adjacency_matrix.append([int(x) for x in line.strip().split()])
+            
+            # Ensure the adjacency matrix dimensions are correct
+            if len(adjacency_matrix) != num_nodes or any(len(row) != num_nodes for row in adjacency_matrix):
+                raise ValueError("Adjacency matrix dimensions do not match the number of nodes")
+            
+            # Generate random weights for each node
+            rand_instance = random.Random(108122)
+            weights = [rand_instance.randint(1, 100) for _ in range(num_nodes)]
+            
+            # Construct the JSON object
+            graph_data = {
+                "graph_name": graph_name,
+                "adjacency_matrix": adjacency_matrix,
+                "node_weights": weights
+            }
+            
+            # Return as a JSONL-compatible string
+            return json.dumps(graph_data)
+
+    @staticmethod
+    def graphs_txt_to_jsonl(input_dir='../graphs/graph_dataset', output_filename='../graphs/graph_dataset.jsonl'):
+        """
+        Convert a dataset of graphs stored in text files to a single JSON Lines file.
+
+        Parameters:
+        - input_dir (str): Directory containing text files with graph data.
+        - output_filename (str): Output JSON Lines file to store the graph dataset.
+        """
+        # Open the output file in write mode
+        with open(output_filename, 'w') as f:
+            # Loop through each file in the input directory
+            for file in os.listdir(input_dir):
+                if file.endswith('.txt'):  # Ensure only text files are processed
+                    graph_name = os.path.splitext(file)[0]  # Use the file name without extension as graph name
+                    file_path = os.path.join(input_dir, file)
+                    
+                    try:
+                        # Convert the graph to a JSONL line
+                        graph_jsonl = utils.create_graph_jsonl(file_path, graph_name)
+                        
+                        # Write the JSONL line to the output file
+                        f.write(graph_jsonl + '\n')
+                    except Exception as e:
+                        print(f"Failed to process {file}: {e}")
+
+        print(f"Graph dataset saved to {output_filename}")

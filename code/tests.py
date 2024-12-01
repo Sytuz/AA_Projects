@@ -1,5 +1,7 @@
-from utils import utils
+from stresstester import stressTester
 from algorithms import algorithms
+from utils import utils
+import networkx as nx
 
 # The tests were organized and executed in a Jupyter Notebook, however the notebook quickly became desorganized and hard to read.
 # Because of that, the tests were moved to this file so that the professor can easily read and understand them.
@@ -46,7 +48,7 @@ def full_test_with_iterations():
     #utils.full_stress_test(algorithms.monte_carlo_with_filter, base_filename="monte_carlo_with_filter_compare", n_max=800, stored_graphs=False, sample_size=1, iterations=[25, 50, 100, 250, 500, 750, 1000])
     utils.full_stress_test(algorithms.heuristic_monte_carlo, base_filename="heuristic_monte_carlo_compare", stored_graphs=True, sample_size=1, iterations=[25, 50, 100, 250, 500, 750, 1000])
     
-def quick_precision_test(name, algorithm, k, n, iterations=1000, initial_temp=100, cooling_rate=0.99, trials=1):
+def quick_precision_test(name, algorithm, k, n, iterations=1000, initial_temp=1000, cooling_rate=0.99, trials=1):
     """ Quick test to check the precision of an algorithm """
     print(f"Testing {name}'s precision")
     precision = algorithms.compare_precision(algorithm, k, n, func_iterations=iterations, initial_temp=initial_temp, cooling_rate=cooling_rate, iterations=trials)
@@ -54,18 +56,16 @@ def quick_precision_test(name, algorithm, k, n, iterations=1000, initial_temp=10
     
 def main():
     """ Main function """
-    #quick_precision_test("Monte Carlo", algorithms.monte_carlo, 0.75, 100, 250)
-    #quick_precision_test("Simulated Annealing", algorithms.simulated_annealing, 0.75, 50, 1000, 1000, 0.99, 10)
+    #quick_precision_test("Monte Carlo", algorithms.monte_carlo, 0.75, 175, 250)
+    #quick_precision_test("Heuristic Monte Carlo", algorithms.heuristic_monte_carlo, 0.75, 175, 250)
+    #quick_precision_test("Simulated Annealing", algorithms.simulated_annealing, 0.75, 175, 1000, 1000, 0.99)
+    #quick_precision_test("Threaded Heuristic Monte Carlo", algorithms.threaded_heuristic_monte_carlo, 0.75, 175, 250)
 
-
-    # Simulated Annealing Tuning
-    n = 50
-    iterations = 500
-    for k in [0.125, 0.25, 0.50, 0.75]:
-        best_data = algorithms.tune_parameters(algorithms.simulated_annealing, k, n, iterations)
-        print(f"Simulated Annealing Tuning for k={k}, n={n}, iterations={iterations}")
-        print(f"Best Parameters: {best_data['best_params']}")
-        print(f"Best Precision: {best_data['best_precision']}")
+    # Stress Tests
+    stressTester.stress_test(func=algorithms.weight_to_degree_v1, base_filename="weight_to_degree")
+    stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo",iterations=500)
+    stressTester.stress_test(func=algorithms.threaded_heuristic_monte_carlo, base_filename="threaded_heuristic_monte_carlo",iterations=500)
+    stressTester.stress_test(func=algorithms.simulated_annealing, base_filename="simulated_annealing",iterations=500)
 
     #graph_creation()
     #full_test()
