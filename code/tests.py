@@ -62,10 +62,10 @@ def main():
     #quick_precision_test("Threaded Heuristic Monte Carlo", algorithms.threaded_heuristic_monte_carlo, 0.75, 175, 250)
 
     # Stress Tests
-    stressTester.stress_test(func=algorithms.weight_to_degree_v1, base_filename="weight_to_degree")
-    stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo",iterations=500)
-    stressTester.stress_test(func=algorithms.threaded_heuristic_monte_carlo, base_filename="threaded_heuristic_monte_carlo",iterations=500)
-    stressTester.stress_test(func=algorithms.simulated_annealing, base_filename="simulated_annealing",iterations=500)
+    #stressTester.stress_test(func=algorithms.weight_to_degree_v1, base_filename="weight_to_degree")
+    #stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo_test",iterations=500)
+    stressTester.stress_test(func=algorithms.threaded_heuristic_monte_carlo, base_filename="threaded_heuristic_monte_carlo_test",iterations=500)
+    #stressTester.stress_test(func=algorithms.simulated_annealing, base_filename="simulated_annealing",iterations=500)
 
     #graph_creation()
     #full_test()

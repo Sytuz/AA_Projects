@@ -1,8 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
-from multiprocessing import Pool, cpu_count
+from threading import Lock
 from utils import utils
 import networkx as nx
 from tqdm import tqdm
+import hashlib
 import time
 import math
 import random
@@ -151,8 +152,8 @@ class algorithms:
     def monte_carlo(G, iterations=1000):
         """
         Randomized algorithm to find a near-optimal maximum weight independent set.
-        Combines randomness with weighted heuristics.
-        
+        Combines randomness with weighted heuristics, ensuring unique solutions based on node order.
+
         Args:
             G: A graph with weights on nodes.
             iterations: Number of iterations for refinement.
@@ -165,13 +166,27 @@ class algorithms:
         best_weight = 0
         ops = 0  # Initialize operation count
 
+        tested_orders = set()  # Track previously tested orders by their hash
+
         for _ in range(iterations):
-            current_set = set()
-            current_weight = 0
 
             nodes = list(G.nodes)
             random.shuffle(nodes)  # Randomize node order
 
+            # Hash the node order
+            order_hash = hashlib.sha256(str(nodes).encode()).hexdigest()
+            ops += 1  # Increment for hashing operation
+
+            # Check if this order was already tested
+            if order_hash in tested_orders:
+                continue  # Skip duplicate order
+
+            tested_orders.add(order_hash)
+            ops += 1  # Increment for adding hash to the set
+
+            # Deterministically solve for the current order
+            current_set = set()
+            current_weight = 0
             excluded_nodes = set()
 
             for node in nodes:
@@ -199,65 +214,6 @@ class algorithms:
 
         return best_set, ops
     
-    def heuristic_monte_carlo(G, iterations=1000):
-        """
-        Randomized algorithm to find a near-optimal maximum weight independent set.
-        Combines randomness with the weighted-to-degree heuristic.
-
-        Args:
-            G: A graph with weights on nodes.
-            iterations: Number of iterations for refinement.
-
-        Returns:
-            A tuple of the maximum independent set found and the operation count.
-        """
-        best_set = set()
-        best_weight = 0
-        ops = 0
-
-        nodes = list(G.nodes)
-        # Separate isolated nodes
-        isolated_nodes = {node for node in nodes if G.degree(node) == 0}
-        weight_degree_ratio = [
-            (node, G.nodes[node]['weight'] / G.degree(node))
-            for node in nodes if G.degree(node) > 0
-        ]
-        
-        if not weight_degree_ratio:  # Handle edge case where all nodes are isolated
-            return isolated_nodes, 1
-
-        total_ratio = sum(ratio for _, ratio in weight_degree_ratio)
-        if total_ratio <= 0 or not math.isfinite(total_ratio):
-            raise ValueError("Total ratio must be positive and finite")
-
-        probabilities = [ratio / total_ratio for _, ratio in weight_degree_ratio]
-
-        for _ in range(iterations):
-            current_set = set(isolated_nodes)  # Start with isolated nodes
-            current_weight = sum(G.nodes[node]['weight'] for node in isolated_nodes)
-            
-            # Shuffle nodes based on the calculated probabilities
-            shuffled_nodes = random.choices([node for node, _ in weight_degree_ratio], weights=probabilities, k=len(weight_degree_ratio))
-            excluded_nodes = set()
-
-            for node in shuffled_nodes:
-                ops += 1
-                if node in excluded_nodes:
-                    continue
-
-                current_set.add(node)
-                current_weight += G.nodes[node]['weight']
-                excluded_nodes.add(node)
-                excluded_nodes.update(G.neighbors(node))
-                ops += len(list(G.neighbors(node)))
-
-            if current_weight > best_weight:
-                best_set = current_set
-                best_weight = current_weight
-                ops += 1
-
-        return best_set, ops
-
     @staticmethod
     def simulated_annealing(G, iterations=1000, initial_temp=100, cooling_rate=0.99):
         """
@@ -334,6 +290,9 @@ class algorithms:
 
         return best_set, ops
 
+    tested_hashes = set()
+    lock = Lock()
+
     @staticmethod
     def heuristic_monte_carlo_worker_thread(G, isolated_nodes, weight_degree_ratio, probabilities, iterations):
         """
@@ -352,8 +311,15 @@ class algorithms:
                 weights=probabilities,
                 k=len(weight_degree_ratio)
             )
-            excluded_nodes = set()
 
+            # Create a unique hash for the shuffled node order
+            order_hash = hashlib.sha256(str(shuffled_nodes).encode()).hexdigest()
+            with algorithms.lock:
+                if order_hash in algorithms.tested_hashes:
+                    continue
+                algorithms.tested_hashes.add(order_hash)
+
+            excluded_nodes = set()
             for node in shuffled_nodes:
                 ops += 1
                 if node in excluded_nodes:
