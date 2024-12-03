@@ -1,80 +1,11 @@
-from scipy.stats import rankdata
 from algorithms import algorithms
+from scipy.stats import rankdata
 import matplotlib.pyplot as plt
+from constants import *
 from utils import utils
 import pandas as pd
 import numpy as np
 import matplotlib
-
-# This file is a collection of functions that generate the visualizations for the project report
-# It is sort of disorganized because I had to move the functions from the Jupyter Notebook to this file
-
-""" ----- Constants ----- """
-k_full = [0.125, 0.25, 0.5, 0.75]
-k_values = [125, 25, 50, 75]
-
-iterations = [25, 50, 100, 250, 500, 750, 1000]
-
-# File paths for the data
-OLD_EXHAUSTIVE_PATH = "../data/exhaustive_v1/exhaustive_v1_p_{}.csv"
-EXHAUSTIVE_PATH = "../data/exhaustive/exhaustive_p_{}.csv"
-BIGGEST_WEIGHT_FIRST_PATH = "../data/biggest_weight_first_compare/biggest_weight_first_compare_p_{}.csv"
-SMALLEST_DEGREE_FIRST_PATH = "../data/smallest_degree_first_compare/smallest_degree_first_compare_p_{}.csv"
-WEIGHT_TO_DEGREE_PATH = "../data/weight_to_degree_compare/weight_to_degree_compare_p_{}.csv"
-MONTE_CARLO_PATH = "../data/monte_carlo_compare/p_{}/results_{}.csv"
-HEURISTIC_MONTE_CARLO_PATH = "../data/heuristic_monte_carlo_compare/p_{}/results_{}.csv"
-
-FULL_BIGGEST_WEIGHT_FIRST_PATH = "../data/biggest_weight_first/biggest_weight_first_p_{}.csv"
-FULL_SMALLEST_DEGREE_FIRST_PATH = "../data/smallest_degree_first/smallest_degree_first_p_{}.csv"
-FULL_WEIGHT_TO_DEGREE_PATH = "../data/weight_to_degree/weight_to_degree_p_{}.csv"
-
-# Constants used for the plots
-SOLUTION_SIZE = 'Solution Size'
-GRAPH_SIZE_AXIS = 'Graph Size (|V|)'
-TOTAL_WEIGHT = 'Total Weight'
-EXECUTION_TIME = 'Execution Time (seconds)'
-NUMBER_OF_OPERATIONS = 'Number of Operations'
-UPPER_RIGHT = 'upper right'
-
-# Constants used to identify the algorithms in the data
-OLD_EXHAUSTIVE = 'Old Exhaustive'
-EXHAUSTIVE = 'Exhaustive'
-BIGGEST_WEIGHT_FIRST = 'Biggest Weight First'
-SMALLEST_DEGREE_FIRST = 'Smallest Degree First'
-WEIGHT_TO_DEGREE = 'Weight to Degree'
-MONTE_CARLO = 'Monte Carlo'
-HEURISTIC_MONTE_CARLO = 'Heuristic Monte Carlo'
-
-ALGORITHMS = [OLD_EXHAUSTIVE, EXHAUSTIVE, BIGGEST_WEIGHT_FIRST, SMALLEST_DEGREE_FIRST, WEIGHT_TO_DEGREE]
-
-RANDOMIZED_ALGORITHMS = [MONTE_CARLO, HEURISTIC_MONTE_CARLO]
-
-# Labels
-EXH = 'Exhaustive'
-WMAX = 'WMax - Biggest Weight First'
-DMIN = 'DMin - Smallest Degree First'
-WDMIX = 'WDMix - Weight to Degree'
-MC = 'Monte Carlo'
-HMC = 'Heuristic Monte Carlo (WDMix)'
-
-LABELS = {
-    EXHAUSTIVE: EXH,
-    BIGGEST_WEIGHT_FIRST: WMAX,
-    SMALLEST_DEGREE_FIRST: DMIN,
-    WEIGHT_TO_DEGREE: WDMIX,
-    MONTE_CARLO: MC,
-    HEURISTIC_MONTE_CARLO: HMC
-}
-
-# Define colors for each algorithm
-colors = {
-    EXHAUSTIVE: 'red',
-    BIGGEST_WEIGHT_FIRST: 'orange',
-    SMALLEST_DEGREE_FIRST: 'green',
-    WEIGHT_TO_DEGREE: 'purple',
-    MONTE_CARLO: 'blue',
-    HEURISTIC_MONTE_CARLO: 'cyan'
-}
 
 # Load dataframes for each algorithm and k value
 dataframes = {
@@ -87,7 +18,7 @@ dataframes = {
 
 dataframes_randomized = {
     MONTE_CARLO: {k: {i: pd.read_csv(MONTE_CARLO_PATH.format(k, i)) for i in iterations} for k in k_values},
-    HEURISTIC_MONTE_CARLO: {k: {i: pd.read_csv(HEURISTIC_MONTE_CARLO_PATH.format(k, i)) for i in iterations} for k in k_values}
+    THREADED_HEURISTIC_MONTE_CARLO: {k: {i: pd.read_csv(HEURISTIC_MONTE_CARLO_PATH.format(k, i)) for i in iterations} for k in k_values}
 }
 
 dataframes_heuristic_full = {
@@ -147,57 +78,87 @@ def remarks_graphs():
     # Log the conclusion of the function
     print("remarks_graphs() - Done")
     
-
-def exhaustive_comparison_time():
-    """ Compare the execution time of the two exhaustive algorithms (Fig.2) """
+def single_metric_comparison(algorithms, filenames, title, metric, output_filename='single_metric_comparison.png', average=None, log_scale=False):
+    """
+    Compare a single metric across different algorithms, and save the plot as an image.
     
-    # Extract data for execution times by graph size and k
-    algorithm1_times = {k: dataframes[OLD_EXHAUSTIVE][k][EXECUTION_TIME].to_list() for k in k_values}
-    algorithm2_times = {k: dataframes[EXHAUSTIVE][k][EXECUTION_TIME].to_list() for k in k_values}
-
-    # Determine the maximum graph size across all k values
-    max_graph_size_v1 = max(len(times) for times in algorithm1_times.values())
-    max_graph_size_v2 = max(len(times) for times in algorithm2_times.values())
-
-    # Function to calculate the mean with available data
-    def calculate_mean(times_dict, graph_size):
-        values = [times[graph_size] for times in times_dict.values() if graph_size < len(times)]
-        return np.mean(values) if values else np.nan
-
-    # Calculate the average execution time for each graph size across the k values
-    avg_algorithm1_times = [calculate_mean(algorithm1_times, i) for i in range(max_graph_size_v1)]
-    avg_algorithm2_times = [calculate_mean(algorithm2_times, i) for i in range(max_graph_size_v2)]
-
-    # Plot Execution Time as a line graph
+    Args:
+    algorithms (list): List of algorithms to compare
+    filenames (list): List of filenames for the data of each algorithm
+    title (str): Title of the plot
+    metric (str): Metric to compare
+    output_filename (str): Filename for the output image (optional)
+    average (list): List of pd.Series with the average data for each algorithm (optional)
+    log_scale (bool): Whether to use a logarithmic scale for the y-axis (optional)
+    
+    Returns:
+    None
+    """
+    
+    # Set up the plot
     plt.figure(figsize=(12, 6))
 
-    # Colors for distinguishing lines
-    colors = matplotlib.colormaps["tab10"]
+    # Plot the data for each algorithm
+    for algorithm, filename in zip(algorithms, filenames):
+        df = pd.read_csv('../data/' + filename)
+        if average:
+            plt.plot(df[NODE_COUNT], average[algorithm], label=LABELS[algorithm], color=colors[algorithm])
+        else:
+            plt.plot(df[NODE_COUNT], df[metric], label=LABELS[algorithm], color=colors[algorithm])
 
-    # Plot average execution times for both algorithms
-    plt.plot(range(max_graph_size_v1), avg_algorithm1_times, marker='o', color=colors(0), linestyle='-', linewidth=1.5, label='Exhaustive V1')
-    plt.plot(range(max_graph_size_v2), avg_algorithm2_times, marker='s', color=colors(3), linestyle='--', linewidth=1.5, label='Exhaustive V2')
-
-    # Set labels and legend for Execution Time plot
+    # Set labels and legend for the plot
     plt.xlabel(GRAPH_SIZE_AXIS)
-    plt.ylabel('Execution Time (s)')
-    plt.title('Average Execution Time by Graph Size (for k in [12.5, 25, 50, 75])')
+    plt.ylabel(metric)
+    plt.title(title)
+    plt.legend(loc=UPPER_LEFT, fontsize='small')
 
-    # Use logarithmic scale for y-axis
-    plt.yscale('log')
-
-    # Adjust legend to stay inside the plot
-    plt.legend(loc=UPPER_RIGHT, bbox_to_anchor=(0.95, 0.95), fontsize='small')
-
-    # Layout adjustments
-    plt.tight_layout()
+    # Use logarithmic scale for the y-axis if specified
+    if log_scale:
+        plt.yscale('log')
 
     # Save the plot
-    plt.savefig('../images/execution_time_comparison_average.png', dpi=300)
+    plt.tight_layout()
+    plt.savefig(f'../images/{output_filename}', dpi=300)
     plt.close()
     
     # Log the conclusion of the function
-    print("exhaustive_comparison_time() - Done")
+    print(f"{output_filename.split('/')[-1]} - Done")
+
+def exhaustive_comparison_time_operations():
+    """Compare the execution time of the two exhaustive algorithms using helper functions."""
+    
+    # Use results_average to calculate averages for both algorithms
+    avg_algorithm1_times = utils.results_average('exhaustive_v1', k_vals=k_values, metric=EXECUTION_TIME)
+    avg_algorithm2_times = utils.results_average('exhaustive', k_vals=k_values, metric=EXECUTION_TIME)
+    
+    avg_algorithm1_ops = utils.results_average('exhaustive_v1', k_vals=k_values, metric=NUMBER_OF_OPERATIONS)
+    avg_algorithm2_ops = utils.results_average('exhaustive', k_vals=k_values, metric=NUMBER_OF_OPERATIONS)
+
+    # Prepare the inputs for the helper function
+    algorithms = [OLD_EXHAUSTIVE, EXHAUSTIVE]
+    filenames = []  # No filenames needed as we're passing averages directly
+    titles = ['Average Execution Time by Graph Size (for k in [12.5, 25, 50, 75])', 'Average Number of Operations by Graph Size (for k in [12.5, 25, 50, 75])']
+    metrics = [EXECUTION_TIME, NUMBER_OF_OPERATIONS]
+    averages = [{
+        OLD_EXHAUSTIVE: avg_algorithm1_times,
+        EXHAUSTIVE: avg_algorithm2_times
+    },
+    {
+        OLD_EXHAUSTIVE: avg_algorithm1_ops,
+        EXHAUSTIVE: avg_algorithm2_ops
+    }]
+
+    # Call the helper function with log scale
+    for i in range(2):
+        single_metric_comparison(
+            algorithms=algorithms,
+            filenames=filenames,
+            title=titles[i],
+            metric=metrics[i],
+            output_filename=f'exhaustive_comparison_{metrics[i]}.png',
+            average=averages[i],
+            log_scale=True
+        )
 
 def exhaustive_comparison_operations():
     """ Compare the number of operations of the two exhaustive algorithms (Fig.3) """
@@ -269,7 +230,7 @@ def greedy_comparison_operations_time():
 
     # Titles and labels for plots
     titles = ['Average Number of Operations', 'Average Execution Time (s)']
-    y_labels = [NUMBER_OF_OPERATIONS, 'Execution Time (s)']
+    y_labels = [NUMBER_OF_OPERATIONS, ]
     data = [avg_ops, avg_time]
     labels = [WMAX, DMIN, WDMIX]
 
@@ -330,13 +291,13 @@ def exhaustive_vs_greedy_size_weight():
         axes[idx, 0].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
         axes[idx, 0].set_ylabel(SOLUTION_SIZE, fontsize=8)
         axes[idx, 0].set_title(f'Solution Size for k={k}', fontsize=10)
-        axes[idx, 0].legend(fontsize=7, loc='upper left')
+        axes[idx, 0].legend(fontsize=7, loc=UPPER_LEFT)
 
         # Set labels for Total Weight plot
         axes[idx, 1].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
         axes[idx, 1].set_ylabel(TOTAL_WEIGHT, fontsize=8)
         axes[idx, 1].set_title(f'Total Weight of Solution for k={k}', fontsize=10)
-        axes[idx, 1].legend(fontsize=7, loc='upper left')
+        axes[idx, 1].legend(fontsize=7, loc=UPPER_LEFT)
         
         size_ranks = np.zeros((4, space))
         weight_ranks = np.zeros((4, space))
@@ -426,7 +387,7 @@ def exhaustive_vs_greedy_error_ratio_and_accuracy():
             error = (dataframes[EXHAUSTIVE][k][TOTAL_WEIGHT].values - df[TOTAL_WEIGHT].values) / dataframes[EXHAUSTIVE][k][TOTAL_WEIGHT].values
             
             # Plot with the respective color and label
-            axs[idx].plot(dataframes[EXHAUSTIVE][k]['Node Count'], error, label=name, color=algorithm_colors[name], alpha=0.65)
+            axs[idx].plot(dataframes[EXHAUSTIVE][k][NODE_COUNT], error, label=name, color=algorithm_colors[name], alpha=0.65)
 
         # Set plot labels and title
         axs[idx].set_xlabel(GRAPH_SIZE_AXIS, fontsize=12)
@@ -536,7 +497,7 @@ def comparison_operations_time():
 
     # Titles and labels for plots
     titles = ['Average Number of Operations', 'Average Execution Time (s)']
-    y_labels = [NUMBER_OF_OPERATIONS, 'Execution Time (s)']
+    y_labels = [NUMBER_OF_OPERATIONS, ]
     data = [avg_ops, avg_time]
     labels = [WMAX, DMIN, WDMIX, MONTE_CARLO, HEURISTIC_MONTE_CARLO]
 
@@ -590,13 +551,13 @@ def exhaustive_vs_algorithms_size_weight():
         axes[idx, 0].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
         axes[idx, 0].set_ylabel(SOLUTION_SIZE, fontsize=8)
         axes[idx, 0].set_title(f'Solution Size for k={k}', fontsize=10)
-        axes[idx, 0].legend(fontsize=7, loc='upper left')
+        axes[idx, 0].legend(fontsize=7, loc=UPPER_LEFT)
 
         # Set labels for Total Weight plot
         axes[idx, 1].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
         axes[idx, 1].set_ylabel(TOTAL_WEIGHT, fontsize=8)
         axes[idx, 1].set_title(f'Total Weight of Solution for k={k}', fontsize=10)
-        axes[idx, 1].legend(fontsize=7, loc='upper left')
+        axes[idx, 1].legend(fontsize=7, loc=UPPER_LEFT)
         
         # Initialize arrays for rankings
         size_ranks = np.zeros((len(ALGORITHMS[1:]) + 2, space))  # Including Monte Carlo algorithms
@@ -641,8 +602,107 @@ def exhaustive_vs_algorithms_size_weight():
     # Log the conclusion of the function
     print("exhaustive_vs_algorithms_size_weight() - Done")
 
+def quick_algo_graph(algorithm, filename):
+    """ 
+    Create a quick graph for the specified algorithm and save it to the given filename. 
+    This is a helper function to quickly visualize the results of an algorithm. 
+
+    Args:
+    algorithm (str) : The algorithm to visualize
+    filename (str) : The filename to load the data from and save the plot to
+    """
+
+    temp_df = pd.read_csv(DATA_FOLDER + filename)
     
-        
+    # Create a figure with subplots
+    _, axes = plt.subplots(2, 2, figsize=(12, 12))
+    
+    x_values = temp_df[NODE_COUNT]
+
+    # Plot Solution Size and Total Weight for the algorithm
+    axes[0][0].plot(x_values, temp_df[SOLUTION_SIZE], label=algorithm, color='red')
+    axes[0][1].plot(x_values, temp_df[TOTAL_WEIGHT], label=algorithm, color='blue')
+    axes[1][0].plot(x_values, temp_df[EXECUTION_TIME], label=algorithm, color='green')
+    axes[1][1].plot(x_values, temp_df[NUMBER_OF_OPERATIONS], label=algorithm, color='purple')
+    
+    # Set labels and legend for both plots
+    axes[0][0].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[0][0].set_ylabel(SOLUTION_SIZE)
+    axes[0][0].set_title('Solution Size for ' + algorithm)
+    axes[0][0].legend()
+    
+    axes[0][1].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[0][1].set_ylabel(TOTAL_WEIGHT)
+    axes[0][1].set_title('Total Weight of Solution for ' + algorithm)
+    axes[0][1].legend()
+    
+    axes[1][0].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[1][0].set_ylabel(EXECUTION_TIME)
+    axes[1][0].set_title('Execution Time for ' + algorithm)
+    axes[1][0].legend()
+    
+    axes[1][1].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[1][1].set_ylabel(NUMBER_OF_OPERATIONS)
+    axes[1][1].set_title('Number of Operations for ' + algorithm)
+    axes[1][1].legend()
+    
+    # Save the plots
+    plt.tight_layout()
+    plt.savefig(DATA_FOLDER + filename.replace('.csv', '.png'), dpi=300)
+    plt.close()
+
+def quick_algo_compare_graphs(algorithms, filenames):
+    """ 
+    Create a quick comparison graph for the specified algorithms and save it to the given filename. 
+    This is a helper function to quickly visualize the results of multiple algorithms. 
+
+    Args:
+    algorithms (list) : The algorithms to visualize
+    filenames (list) : The filenames to load the data from
+    """
+
+    # Create a figure with subplots
+    _, axes = plt.subplots(2, 2, figsize=(12, 12))
+    
+    # Attribute a color to each algorithm
+    colors = ['red', 'blue', 'green', 'purple', 'orange', 'cyan']
+    
+    for i, algorithm in enumerate(algorithms):
+        temp_df = pd.read_csv(DATA_FOLDER + filenames[i])
+        x_values = temp_df[NODE_COUNT]
+
+        # Plot Solution Size and Total Weight for the algorithm
+        axes[0][0].plot(x_values, temp_df[SOLUTION_SIZE], label=algorithm, color=colors[i])
+        axes[0][1].plot(x_values, temp_df[TOTAL_WEIGHT], label=algorithm, color=colors[i])
+        axes[1][0].plot(x_values, temp_df[EXECUTION_TIME], label=algorithm, color=colors[i])
+        axes[1][1].plot(x_values, temp_df[NUMBER_OF_OPERATIONS], label=algorithm, color=colors[i])
+    
+    # Set labels and legend for both plots
+    axes[0][0].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[0][0].set_ylabel(SOLUTION_SIZE)
+    axes[0][0].set_title('Solution Size Comparison')
+    axes[0][0].legend()
+    
+    axes[0][1].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[0][1].set_ylabel(TOTAL_WEIGHT)
+    axes[0][1].set_title('Total Weight Comparison')
+    axes[0][1].legend()
+    
+    axes[1][0].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[1][0].set_ylabel(EXECUTION_TIME)
+    axes[1][0].set_title('Execution Time Comparison')
+    axes[1][0].legend()
+    
+    axes[1][1].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[1][1].set_ylabel(NUMBER_OF_OPERATIONS)
+    axes[1][1].set_title('Number of Operations Comparison')
+    axes[1][1].legend()
+    
+    # Save the plots
+    plt.tight_layout()
+    plt.savefig('../images/quick_comparison.png', dpi=300)
+    plt.close()
+
 if __name__ == "__main__":
     remarks_graphs()
     exhaustive_comparison_time()

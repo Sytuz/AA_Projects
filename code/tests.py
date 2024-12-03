@@ -1,6 +1,8 @@
 from stresstester import stressTester
 from algorithms import algorithms
+from constants import *
 from utils import utils
+from visualgraphs import quick_algo_graph, quick_algo_compare_graphs, single_metric_comparison, exhaustive_comparison_time_operations
 import networkx as nx
 
 # The tests were organized and executed in a Jupyter Notebook, however the notebook quickly became desorganized and hard to read.
@@ -64,9 +66,26 @@ def main():
     # Stress Tests
     #stressTester.stress_test(func=algorithms.weight_to_degree_v1, base_filename="weight_to_degree")
     #stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo_test",iterations=500)
-    stressTester.stress_test(func=algorithms.threaded_heuristic_monte_carlo, base_filename="threaded_heuristic_monte_carlo_test",iterations=500)
+    #stressTester.stress_test(func=algorithms.threaded_heuristic_monte_carlo, base_filename="threaded_heuristic_monte_carlo_test",iterations=500)
+    #stressTester.stress_test(func=algorithms.simulated_annealing, base_filename="simulated_annealing_test",iterations=5000, generate={'n_max':1000, 'k':0.50, 'step':50})
+    #quick_algo_graph('Simulated Annealing', 'simulated_annealing_test/results_0.5.csv')
+    #stressTester.stress_test(func=algorithms.parallel_heuristic_monte_carlo, base_filename="parallel_heuristic_monte_carlo_test",iterations=5000, generate={'n_max':1000, 'k':0.50, 'step':50})
+    #quick_algo_graph('Parallel Heuristic Monte Carlo', 'parallel_heuristic_monte_carlo_test/results_0.5.csv')
+    stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo_test",iterations=5000, generate={'n_max':1000, 'k':0.125, 'step':50})
+    stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo_test",iterations=5000, generate={'n_max':1000, 'k':0.25, 'step':50})
+    stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo_test",iterations=5000, generate={'n_max':1000, 'k':0.50, 'step':50})
+    stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo_test",iterations=5000, generate={'n_max':1000, 'k':0.75, 'step':50})
+    quick_algo_compare_graphs([f'Monte Carlo - k={k}' for k in k_full], [f'monte_carlo_test/results_{k}.csv' for k in k_full])
+    #quick_algo_graph('Monte Carlo', 'monte_carlo_test/results_0.5.csv')
+    #stressTester.stress_test(func=algorithms.weight_to_degree_v1, base_filename="weight_to_degree_test", generate={'n_max':1000, 'k':0.50, 'step':50})
+    #quick_algo_graph('Weight-to-Degree Heuristic', 'weight_to_degree_test/results_0.5.csv')
+    #quick_algo_compare_graphs(['Threaded Heuristic Monte Carlo', 'Monte Carlo', 'Simulated Annealing', 'Weight-to-Degree Heuristic'], ['threaded_heuristic_monte_carlo_test/results_0.5.csv', 'monte_carlo_test/results_0.5.csv', 'simulated_annealing_test/results_0.5.csv', 'weight_to_degree_test/results_0.5.csv'])
     #stressTester.stress_test(func=algorithms.simulated_annealing, base_filename="simulated_annealing",iterations=500)
 
+    # Single Metric Comparison
+    #single_metric_comparison([SIMULATED_ANNEALING], ['simulated_annealing_test/results_0.5.csv'], 'Test - Execution Time', EXECUTION_TIME, output_filename='../images/single_metric_comparison_test.png')
+    #exhaustive_comparison_time_operations()
+    
     #graph_creation()
     #full_test()
     #full_test_with_iterations()

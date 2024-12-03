@@ -71,19 +71,8 @@ class stressTester:
         # Max time in seconds
         max_time_seconds = max_time_minutes * 60
 
-        # Clean up and recreate the base folder
-        if os.path.exists(base_folder):
-            for item in os.listdir(base_folder):
-                item_path = os.path.join(base_folder, item)
-                if os.path.isfile(item_path):
-                    os.remove(item_path)
-                elif os.path.isdir(item_path):
-                    for sub_item in os.listdir(item_path):
-                        sub_item_path = os.path.join(item_path, sub_item)
-                        if os.path.isfile(sub_item_path):
-                            os.remove(sub_item_path)
-                    os.rmdir(item_path)
-        else:
+        # Create the base folder if it doesn't exist
+        if not os.path.exists(base_folder):
             os.makedirs(base_folder)
 
         if generate:
@@ -96,6 +85,7 @@ class stressTester:
 
         # Prepare to write results to a single CSV file
         filename = os.path.join(base_folder, "results.csv" if not generate else f"results_{k}.csv")
+        print(f"Writing results to {filename}")
         with open(filename, mode='w', newline='') as file:
             writer = csv.writer(file)
 
@@ -105,14 +95,22 @@ class stressTester:
 
             # Write CSV header
             writer.writerow(header)
+            
+        if generate:
+            with open(filename, mode='a', newline='') as result_file:
+                writer = csv.writer(result_file)
 
-        # Process each line in the JSONL dataset
-        with open(dataset_file, 'r', encoding='utf-8') as jsonl_file, open(filename, mode='a', newline='') as result_file:
-            writer = csv.writer(result_file)
-
-            if not generate:
                 # Wrapping the file iterator with tqdm for better progress tracking
-                for line in tqdm(jsonl_file, desc="Stress Testing Graphs", unit='graph', total=sum(1 for line in open(dataset_file))):
+                for _, G in tqdm(graph_dataset.items(), desc="Stress Testing Generated Graphs"):
+                        # Run the stress test on the generated graph
+                        stressTester.run_stress_test_iteration(func, G, max_time_seconds, iterations, writer)
+        else:
+            # Process each line in the JSONL dataset
+            with open(dataset_file, 'r', encoding='utf-8') as jsonl_file, open(filename, mode='a', newline='') as result_file:
+                writer = csv.writer(result_file)
+
+                # Wrapping the file iterator with tqdm for better progress tracking
+                for line in tqdm(jsonl_file, desc="Stress Testing Graphs", unit='graph', total=sum(1 for _ in open(dataset_file))):
                     try:
                         # Load the graph data from the current JSONL line
                         graph_data = json.loads(line)
@@ -131,10 +129,7 @@ class stressTester:
 
                     except Exception as e:
                         print(f"Failed to process graph: {e}")
-            else:
-                for G in tqdm(graph_dataset, desc="Stress Testing Generated Graphs"):
-                    # Run the stress test on the generated graph
-                    stressTester.run_stress_test_iteration(func, G, max_time_seconds, iterations, writer)
+                
 
     @staticmethod
     def _execute_function(func, G, max_time_seconds, iterations=None):

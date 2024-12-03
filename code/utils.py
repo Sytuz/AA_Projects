@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from constants import k_values
 import networkx as nx
 from tqdm import tqdm
 import pandas as pd
@@ -43,7 +44,7 @@ class utils:
             |  file_name (str): Base name for the output files.
 
         Returns:
-            str: Path to the output file.
+            str: Path to the output file with saved graphs.
         """
 
         if save_data:
@@ -348,3 +349,32 @@ class utils:
                         print(f"Failed to process {file}: {e}")
 
         print(f"Graph dataset saved to {output_filename}")
+        
+    @staticmethod
+    def results_average(foldername, k_vals=k_values, metric='Total Weight'):
+        """
+        Calculate the average metric value for each graph size in the results DataFrame.
+
+        Parameters:
+        - foldername (str): Name of the folder containing the results CSV files.
+        - k_vals (list): List of k values for which to calculate the average metric.
+        - metric (str): The metric column to calculate the average.
+
+        Returns:
+        - pd.Series: Series containing the average metric value for each graph size.
+        """
+        
+        # Initialize an empty dictionary to store the average metric values
+        average_values = {}
+        
+        # Loop through each k value
+        for k in k_vals:
+            # Load the results DataFrame for the current k value
+            results_df = pd.read_csv(f'../data/{foldername}/results_{k}.csv')
+            
+            # Calculate the average metric value for each graph size
+            average_values[k] = results_df.groupby('Node Count')[metric].mean().values
+        
+        # Convert the dictionary to a pandas Series
+        return pd.Series(average_values)
+        

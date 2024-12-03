@@ -1,7 +1,8 @@
-from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Pool, Manager
 from threading import Lock
 from utils import utils
 import networkx as nx
+from phmc import PHMC
 from tqdm import tqdm
 import hashlib
 import time
@@ -166,23 +167,11 @@ class algorithms:
         best_weight = 0
         ops = 0  # Initialize operation count
 
-        tested_orders = set()  # Track previously tested orders by their hash
-
         for _ in range(iterations):
 
             nodes = list(G.nodes)
             random.shuffle(nodes)  # Randomize node order
-
-            # Hash the node order
-            order_hash = hashlib.sha256(str(nodes).encode()).hexdigest()
-            ops += 1  # Increment for hashing operation
-
-            # Check if this order was already tested
-            if order_hash in tested_orders:
-                continue  # Skip duplicate order
-
-            tested_orders.add(order_hash)
-            ops += 1  # Increment for adding hash to the set
+            ops += len(G.nodes)  # Increment for shuffling nodes
 
             # Deterministically solve for the current order
             current_set = set()
@@ -210,14 +199,14 @@ class algorithms:
             if current_weight > best_weight:
                 best_set = current_set
                 best_weight = current_weight
-                ops += 1  # Increment for updating the best solution
+                ops += 2  # Increment for updating the best solution
 
         return best_set, ops
     
     @staticmethod
     def simulated_annealing(G, iterations=1000, initial_temp=100, cooling_rate=0.99):
         """
-        Simulated Annealing algorithm to solve the MWIS problem.
+        Optimized Simulated Annealing algorithm to solve the MWIS problem.
 
         Args:
             G: A graph with weights on nodes.
@@ -228,120 +217,92 @@ class algorithms:
         Returns:
             A tuple of the best independent set found and the operation count.
         """
+        
+        ops = 0  # Operation count
+        
         def calculate_weight(independent_set):
-            """Helper function to calculate the weight of an independent set."""
-            return sum(G.nodes[node]['weight'] for node in independent_set)
+            """Calculate the total weight of a set."""
+            nonlocal ops
+            ops += len(independent_set)  # Increment for weight calculation
+            return sum(weights[node] for node in independent_set)
 
-        def get_neighbors(solution):
+        def get_random_neighbor(solution):
             """
-            Generate neighbors by attempting to add or remove nodes while
-            maintaining independence.
+            Efficiently generate a single random neighbor by adding or removing a node.
+            Ensures the neighbor remains an independent set.
             """
-            neighbors = []
-            for node in G.nodes:
-                if node not in solution and all(n not in solution for n in G.neighbors(node)):
-                    # Add a valid node
-                    neighbor = solution | {node}
-                    neighbors.append(neighbor)
-                elif node in solution:
-                    # Remove a node
-                    neighbor = solution - {node}
-                    neighbors.append(neighbor)
-            return neighbors
+            nonlocal ops
+            ops += 1  # Increment for deciding between add/remove
+            
+            if random.random() < 0.5:
+                # Attempt to add a node
+                candidates = [
+                    node for node in G.nodes
+                    if node not in solution and all(n not in solution for n in G.neighbors(node))
+                ]
+                ops += len(G.nodes) + sum(len(list(G.neighbors(node))) for node in candidates)  # Increment for candidate generation
+                if candidates:
+                    node_to_add = random.choice(candidates)
+                    ops += 1  # Increment for choosing a node
+                    return solution | {node_to_add}
+            else:
+                # Attempt to remove a node
+                if solution:
+                    ops += 1  # Increment for checking if solution is non-empty
+                    node_to_remove = random.choice(list(solution))
+                    ops += 1  # Increment for choosing a node to remove
+                    return solution - {node_to_remove}
+            return solution  # No change if no valid neighbor is found
 
-        # Initialize with a random independent set
+        # Precompute node weights for efficiency
+        weights = {node: G.nodes[node]['weight'] for node in G.nodes}
+        ops += len(G.nodes)  # Increment for precomputing weights
+
+        # Initialize with a greedy independent set without sorting
         current_set = set()
-        for node in G.nodes:
-            if all(n not in current_set for n in G.neighbors(node)):
-                current_set.add(node)
+        for node in G.nodes:  # Traverse nodes in their natural or random order
+            if all(neighbor not in current_set for neighbor in G.neighbors(node)):
+                current_set.add(node)  # Add node if it's independent
+                ops += 1  # Increment for adding a node
+            ops += len(list(G.neighbors(node)))  # Increment for checking neighbors
 
         current_weight = calculate_weight(current_set)
         best_set = current_set
         best_weight = current_weight
 
-        ops = 0  # Operation count
         temp = initial_temp
 
         for _ in range(iterations):
             ops += 1  # Increment for each iteration
 
             # Generate a random neighbor
-            neighbors = get_neighbors(current_set)
-            if not neighbors:
-                break  # No valid neighbors
-
-            new_set = random.choice(neighbors)
+            new_set = get_random_neighbor(current_set)
             new_weight = calculate_weight(new_set)
 
             # Decide whether to accept the new solution
             if new_weight > current_weight or random.random() < math.exp((new_weight - current_weight) / temp):
                 current_set = new_set
                 current_weight = new_weight
-                ops += 1  # Increment for accepting a solution
+                ops += 2  # Increment for accepting a new solution
+
 
             # Update the best solution if needed
             if current_weight > best_weight:
                 best_set = current_set
                 best_weight = current_weight
-                ops += 1  # Increment for updating the best solution
+                ops += 2  # Increment for updating the best solution
 
             # Cool down the temperature
             temp *= cooling_rate
+            ops += 1 # Increment for cooling down the temperature
 
         return best_set, ops
-
-    tested_hashes = set()
-    lock = Lock()
-
-    @staticmethod
-    def heuristic_monte_carlo_worker_thread(G, isolated_nodes, weight_degree_ratio, probabilities, iterations):
+    
+    def parallel_heuristic_monte_carlo(G, iterations=1000):
         """
-        Worker function for thread-based Heuristic Monte Carlo with batched iterations.
-        """
-        best_set = set()
-        best_weight = 0
-        ops = 0
+        Parallelized version of the Heuristic Monte Carlo algorithm to find a near-optimal maximum weight independent set.
+        Combines randomness with weighted heuristics, ensuring unique solutions based on node order.
 
-        for _ in range(iterations):
-            current_set = set(isolated_nodes)
-            current_weight = sum(G.nodes[node]['weight'] for node in isolated_nodes)
-
-            shuffled_nodes = random.choices(
-                [node for node, _ in weight_degree_ratio],
-                weights=probabilities,
-                k=len(weight_degree_ratio)
-            )
-
-            # Create a unique hash for the shuffled node order
-            order_hash = hashlib.sha256(str(shuffled_nodes).encode()).hexdigest()
-            with algorithms.lock:
-                if order_hash in algorithms.tested_hashes:
-                    continue
-                algorithms.tested_hashes.add(order_hash)
-
-            excluded_nodes = set()
-            for node in shuffled_nodes:
-                ops += 1
-                if node in excluded_nodes:
-                    continue
-
-                current_set.add(node)
-                current_weight += G.nodes[node]['weight']
-                excluded_nodes.add(node)
-                excluded_nodes.update(G.neighbors(node))
-                ops += len(list(G.neighbors(node)))
-
-            if current_weight > best_weight:
-                best_set = current_set
-                best_weight = current_weight
-
-        return best_set, best_weight, ops
-
-    @staticmethod
-    def threaded_heuristic_monte_carlo(G, iterations=1000):
-        """
-        Thread-based parallel version of Heuristic Monte Carlo to find a near-optimal MWIS.
-        
         Args:
             G: A graph with weights on nodes.
             iterations: Number of iterations for refinement.
@@ -349,48 +310,11 @@ class algorithms:
         Returns:
             A tuple of the maximum independent set found and the operation count.
         """
-        isolated_nodes = {node for node in G.nodes if G.degree(node) == 0}
-        weight_degree_ratio = [
-            (node, G.nodes[node]['weight'] / G.degree(node))
-            for node in G.nodes if G.degree(node) > 0
-        ]
-        
-        if not weight_degree_ratio:
-            return isolated_nodes, 1
 
-        total_ratio = sum(ratio for _, ratio in weight_degree_ratio)
-        probabilities = [ratio / total_ratio for _, ratio in weight_degree_ratio]
-
-        # Determine thread pool size and iterations per thread
-        max_threads = min(8, iterations)  # Limit to 8 threads or fewer
-        iterations_per_thread = max(1, iterations // max_threads)
-
-        # Prepare worker arguments
-        worker_args = [
-            (G, isolated_nodes, weight_degree_ratio, probabilities, iterations_per_thread)
-            for _ in range(max_threads)
-        ]
-
-        best_set = set()
-        best_weight = 0
-        total_ops = 0
-
-        # Run workers in a thread pool
-        with ThreadPoolExecutor(max_threads) as executor:
-            results = executor.map(
-                lambda args: algorithms.heuristic_monte_carlo_worker_thread(*args),
-                worker_args
-            )
-
-        # Combine results
-        for current_set, current_weight, ops in results:
-            total_ops += ops
-            if current_weight > best_weight:
-                best_set = current_set
-                best_weight = current_weight
-
-        return best_set, total_ops
-
+        # Initialize PHMC object
+        phmc = PHMC(G)
+        return phmc.run(iterations)
+    
     @staticmethod
     def compare_precision(func, p, n, print_results=False, iterations=1, func_iterations=1000, initial_temp=100, cooling_rate=0.99):
         """
