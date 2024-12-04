@@ -47,6 +47,7 @@ class stressTester:
             return False  # Indicate timeout
         except Exception as e:
             print(f"Error during function execution: {e}")
+            raise e
             return False  # Treat errors as timeouts for safety
 
         total_weight = sum(G.nodes[node]['weight'] for node in result)

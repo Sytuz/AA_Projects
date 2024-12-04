@@ -164,15 +164,18 @@ class algorithms:
         best_set = set()
         best_weight = 0
         ops = 0  # Initialize operation count
+        
+        isolated_nodes = {node for node in G.nodes if G.degree(node) == 0}
+        ops += len(G.nodes)  # Increment for isolated nodes
+        
+        nodes = list(set(G.nodes) - isolated_nodes)
 
         for _ in range(iterations):
-
-            nodes = list(G.nodes)
             random.shuffle(nodes)  # Randomize node order
-            ops += len(G.nodes)  # Increment for shuffling nodes
+            ops += len(nodes)  # Increment for shuffling nodes
 
             # Deterministically solve for the current order
-            current_set = set()
+            current_set = set(isolated_nodes)
             current_weight = 0
             excluded_nodes = set()
 
@@ -217,53 +220,63 @@ class algorithms:
         """
         
         ops = 0  # Operation count
+                
+        conflict_nodes = set() # Track nodes that are adjacent to the current solution
+
+        def add_node_to_solution(solution, node):
+            """Add a node to the solution and update conflict_nodes."""
+            nonlocal ops
+            
+            solution.add(node)
+            ops += 1  # Increment for adding a node to the solution
+            
+            conflict_nodes.update(G.neighbors(node))
+            ops += len(list(G.neighbors(node)))  # Increment for updating neighbors
+            
+            conflict_nodes.add(node)
+            ops += 1  # Increment for adding the node itself to conflicts
+
+        def remove_node_from_solution(solution, node):
+            """Remove a node from the solution and update conflict_nodes."""
+            nonlocal ops
+            
+            solution.remove(node)
+            ops += 1  # Increment for removing a node from the solution
+            
+            conflict_nodes.difference_update(G.neighbors(node))
+            ops += len(list(G.neighbors(node)))  # Increment for updating neighbors
+            
+            conflict_nodes.discard(node)
+            ops += 1  # Increment for removing the node itself from conflicts
+            
+        def get_add_candidates(solution):
+            """Return nodes that can be added to the solution."""
+            return set(G.nodes) - solution - conflict_nodes
         
         def calculate_weight(independent_set):
             """Calculate the total weight of a set."""
             nonlocal ops
             ops += len(independent_set)  # Increment for weight calculation
-            return sum(weights[node] for node in independent_set)
-
+            return sum(G.nodes[node]['weight'] for node in independent_set)
+        
         def get_random_neighbor(solution):
-            """
-            Efficiently generate a single random neighbor by adding or removing a node.
-            Ensures the neighbor remains an independent set.
-            """
-            nonlocal ops
-            ops += 1  # Increment for deciding between add/remove
-            
             if random.random() < 0.5:
                 # Attempt to add a node
-                candidates = [
-                    node for node in G.nodes
-                    if node not in solution and all(n not in solution for n in G.neighbors(node))
-                ]
-                ops += len(G.nodes) + sum(len(list(G.neighbors(node))) for node in candidates)  # Increment for candidate generation
+                candidates = get_add_candidates(solution)
                 if candidates:
-                    node_to_add = random.choice(candidates)
-                    ops += 1  # Increment for choosing a node
-                    return solution | {node_to_add}
+                    node_to_add = random.choice(list(candidates))
+                    add_node_to_solution(solution, node_to_add)
             else:
                 # Attempt to remove a node
                 if solution:
-                    ops += 1  # Increment for checking if solution is non-empty
                     node_to_remove = random.choice(list(solution))
-                    ops += 1  # Increment for choosing a node to remove
-                    return solution - {node_to_remove}
-            return solution  # No change if no valid neighbor is found
-
-        # Precompute node weights for efficiency
-        weights = {node: G.nodes[node]['weight'] for node in G.nodes}
-        ops += len(G.nodes)  # Increment for precomputing weights
+                    remove_node_from_solution(solution, node_to_remove)
+            return solution
 
         # Initialize with a greedy independent set without sorting
-        current_set = set()
-        for node in G.nodes:  # Traverse nodes in their natural or random order
-            if all(neighbor not in current_set for neighbor in G.neighbors(node)):
-                current_set.add(node)  # Add node if it's independent
-                ops += 1  # Increment for adding a node
-            ops += len(list(G.neighbors(node)))  # Increment for checking neighbors
-
+        current_set, init_ops = algorithms.monte_carlo(G, 1)
+        ops += init_ops  # Increment for initializing the current set
+        
         current_weight = calculate_weight(current_set)
         best_set = current_set
         best_weight = current_weight

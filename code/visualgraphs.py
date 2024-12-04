@@ -653,7 +653,7 @@ def quick_algo_graph(algorithm, filename):
     plt.savefig(DATA_FOLDER + filename.replace('.csv', '.png'), dpi=300)
     plt.close()
 
-def quick_algo_compare_graphs(algorithms, filenames):
+def quick_algo_compare_graphs(algorithms, filenames, output_filename='../images/quick_comparison.png'):
     """ 
     Create a quick comparison graph for the specified algorithms and save it to the given filename. 
     This is a helper function to quickly visualize the results of multiple algorithms. 
@@ -702,12 +702,11 @@ def quick_algo_compare_graphs(algorithms, filenames):
     
     # Save the plots
     plt.tight_layout()
-    plt.savefig('../images/quick_comparison.png', dpi=300)
+    plt.savefig(output_filename, dpi=300)
     plt.close()
 
 if __name__ == "__main__":
     remarks_graphs()
-    exhaustive_comparison_time()
     exhaustive_comparison_operations()
     exhaustive_vs_greedy_size_weight()
     greedy_comparison_operations_time()
@@ -715,4 +714,3 @@ if __name__ == "__main__":
     exhaustive_vs_greedy_error_ratio_and_accuracy()
     monte_carlo_precision()
     comparison_operations_time()
-    exhaustive_vs_algorithms_size_weight()
