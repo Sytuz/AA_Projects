@@ -19,6 +19,7 @@ def graph_creation():
     # utils.graph_creation_and_save(3500, 0.75, 100)
     
     # Smaller Graphs for Comparing With Exhaustive
+    # Deprecated: utils.graph_creation_and_save()
     utils.graph_creation_and_save(500, 0.125, 1, file_name="small_graphs")
     utils.graph_creation_and_save(500, 0.25, 1, file_name="small_graphs")
     utils.graph_creation_and_save(500, 0.50, 1, file_name="small_graphs")
@@ -28,6 +29,7 @@ def full_test():
     """ Full test of all algorithms """
     """ ATTENTION: This function will take a long time to run, and it will overwrite the data that is already stored"""
     
+    # Deprecated: utils.full_stress_test()
     # Exhaustive
     utils.full_stress_test(algorithms.exhaustive_v2, base_filename="exhaustive", max_time_minutes=1, stored_graphs=False, sample_size=1)
     utils.full_stress_test(algorithms.exhaustive_v1, base_filename="exhaustive_v1", max_time_minutes=2, stored_graphs=False, sample_size=1)
@@ -63,32 +65,56 @@ def main():
     #quick_precision_test("Simulated Annealing", algorithms.simulated_annealing, 0.75, 175, 1000, 1000, 0.99)
     #quick_precision_test("Threaded Heuristic Monte Carlo", algorithms.threaded_heuristic_monte_carlo, 0.75, 175, 250)
 
-    # Stress Tests
-    #stressTester.stress_test(func=algorithms.weight_to_degree_v1, base_filename="weight_to_degree")
-    #stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo_test",iterations=500)
-    #stressTester.stress_test(func=algorithms.threaded_heuristic_monte_carlo, base_filename="threaded_heuristic_monte_carlo_test",iterations=500)
-    #stressTester.stress_test(func=algorithms.simulated_annealing, base_filename="simulated_annealing_test",iterations=5000, generate={'n_max':1000, 'k':0.50, 'step':50})
-    #quick_algo_graph('Simulated Annealing', 'simulated_annealing_test/results_0.5.csv')
-    #stressTester.stress_test(func=algorithms.parallel_heuristic_monte_carlo, base_filename="parallel_heuristic_monte_carlo_test",iterations=5000, generate={'n_max':1000, 'k':0.50, 'step':50})
-    #quick_algo_graph('Parallel Heuristic Monte Carlo', 'parallel_heuristic_monte_carlo_test/results_0.5.csv')
-    stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo_test",iterations=5000, generate={'n_max':1000, 'k':0.125, 'step':50})
-    stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo_test",iterations=5000, generate={'n_max':1000, 'k':0.25, 'step':50})
-    stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo_test",iterations=5000, generate={'n_max':1000, 'k':0.50, 'step':50})
-    stressTester.stress_test(func=algorithms.monte_carlo, base_filename="monte_carlo_test",iterations=5000, generate={'n_max':1000, 'k':0.75, 'step':50})
-    quick_algo_compare_graphs([f'Monte Carlo - k={k}' for k in k_full], [f'monte_carlo_test/results_{k}.csv' for k in k_full])
-    #quick_algo_graph('Monte Carlo', 'monte_carlo_test/results_0.5.csv')
-    #stressTester.stress_test(func=algorithms.weight_to_degree_v1, base_filename="weight_to_degree_test", generate={'n_max':1000, 'k':0.50, 'step':50})
-    #quick_algo_graph('Weight-to-Degree Heuristic', 'weight_to_degree_test/results_0.5.csv')
-    #quick_algo_compare_graphs(['Threaded Heuristic Monte Carlo', 'Monte Carlo', 'Simulated Annealing', 'Weight-to-Degree Heuristic'], ['threaded_heuristic_monte_carlo_test/results_0.5.csv', 'monte_carlo_test/results_0.5.csv', 'simulated_annealing_test/results_0.5.csv', 'weight_to_degree_test/results_0.5.csv'])
-    #stressTester.stress_test(func=algorithms.simulated_annealing, base_filename="simulated_annealing",iterations=500)
-
-    # Single Metric Comparison
-    #single_metric_comparison([SIMULATED_ANNEALING], ['simulated_annealing_test/results_0.5.csv'], 'Test - Execution Time', EXECUTION_TIME, output_filename='../images/single_metric_comparison_test.png')
-    #exhaustive_comparison_time_operations()
+    # Graph Creation
+    """
+    for k in k_full:
+        # Create small graphs for comparing with exhaustive
+        utils.graph_creation(n=500, k=k, step=1, save_data={'output_dir':'../graphs/small_graphs', 'file_name':f'small_graphs'})
+        
+        # Create big graphs for greedy and randomized algorithms
+        utils.graph_creation(n=3500, k=k, step=100, save_data={'output_dir':'../graphs/big_graphs', 'file_name':f'big_graphs'})
+    """
     
-    #graph_creation()
-    #full_test()
-    #full_test_with_iterations()
+    # Stress Tests
+    for k in k_full:
+        # Exhaustive
+        """
+        stressTester.stress_test(func=algorithms.exhaustive_v2, dirname="exhaustive_test", dataset_file=f"../graphs/small_graphs/small_graphs_{k}.csv")
+        stressTester.stress_test(func=algorithms.exhaustive_v1, dirname="exhaustive_v1_test", dataset_file=f"../graphs/small_graphs/small_graphs_{k}.csv")
+        """
+        
+        # Greedy
+        """
+        # Smaller Graphs
+        stressTester.stress_test(func=algorithms.biggest_weight_first_v2, dirname="biggest_weight_first_compare_test", dataset_file=f"../graphs/small_graphs/small_graphs_{k}.csv")
+        stressTester.stress_test(func=algorithms.smallest_degree_first_v1, dirname="smallest_degree_first_compare_test", dataset_file=f"../graphs/small_graphs/small_graphs_{k}.csv")
+        stressTester.stress_test(func=algorithms.weight_to_degree_v1, dirname="weight_to_degree_compare_test", dataset_file=f"../graphs/small_graphs/small_graphs_{k}.csv")
+        
+        # Bigger Graphs
+        stressTester.stress_test(func=algorithms.biggest_weight_first_v2, dirname="biggest_weight_first_test", dataset_file=f"../graphs/big_graphs/big_graphs_{k}.csv")
+        stressTester.stress_test(func=algorithms.smallest_degree_first_v1, dirname="smallest_degree_first_test", dataset_file=f"../graphs/big_graphs/big_graphs_{k}.csv")
+        stressTester.stress_test(func=algorithms.weight_to_degree_v1, dirname="weight_to_degree_test", dataset_file=f"../graphs/big_graphs/big_graphs_{k}.csv")
+        """
+        
+        # Randomized
+        
+        # Number of iterations
+        iterations = 2500
+        
+        # Smaller Graphs
+
+        stressTester.stress_test(func=algorithms.monte_carlo, dirname="monte_carlo_test/small", dataset_file=f"../graphs/small_graphs/small_graphs_{k}.jsonl", iterations=iterations, filename=f"results_{k}")
+        stressTester.stress_test(func=algorithms.parallel_heuristic_monte_carlo, dirname="parallel_heuristic_monte_carlo_test/small", dataset_file=f"../graphs/small_graphs/small_graphs_{k}.jsonl", iterations=iterations, filename=f"results_{k}")
+        stressTester.stress_test(func=algorithms.simulated_annealing, dirname="simulated_annealing_test/small", dataset_file=f"../graphs/small_graphs/small_graphs_{k}.jsonl", iterations=iterations, filename=f"results_{k}")
+
+        
+        # Bigger Graphs
+
+        """
+        stressTester.stress_test(func=algorithms.monte_carlo, dirname="monte_carlo_test/big", ataset_file=f"../graphs/big_graphs/big_graphs_{k}.jsonl", iterations=iterations, filename=f"results_{k}")
+        stressTester.stress_test(func=algorithms.parallel_heuristic_monte_carlo, dirname="parallel_heuristic_monte_carlo_test/big", dataset_file=f"../graphs/big_graphs/big_graphs_{k}.jsonl", iterations=iterations, filename=f"results_{k}")
+        stressTester.stress_test(func=algorithms.simulated_annealing, dirname="simulated_annealing_test/big", dataset_file=f"../graphs/big_graphs/big_graphs_{k}.jsonl", iterations=iterations, filename=f"results_{k}")
+        """
     
 if __name__ == "__main__":
     main()

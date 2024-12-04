@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import matplotlib.pyplot as plt
 from constants import k_values
 import networkx as nx
@@ -7,7 +8,6 @@ import numpy as np
 import itertools
 import threading
 import random
-import pickle
 import json
 import time
 import csv
@@ -30,53 +30,117 @@ class utils:
         return G
 
     @staticmethod
-    def graph_creation(n, k, step, save_data=None):
+    def graph_creation(n, k, step, save_data=None, num_threads=4):
         """
-        Function to create and save graphs to a file, with progress tracking using tqdm.
+        Function to create graphs with parallel processing, a timeout for each graph, 
+        and save to a JSONL file. Writing occurs only after all graphs are generated.
 
         Args:
             n (int): Maximum size of graphs.
             k (float): Edge probability.
             step (int): Step size for graph increments.
-            output_dir (str): Directory to save the graphs.
             save_data (Dict): Dictionary with output directory and file name.
-            |  output_dir (str): Directory to save the graphs.
-            |  file_name (str): Base name for the output files.
+            num_threads (int): Number of threads to use for graph generation.
+            timeout (int): Timeout in seconds for each graph generation task.
 
         Returns:
-            str: Path to the output file with saved graphs.
+            str or Dict: The path to the JSONL file if `save_data` is provided; otherwise, a dictionary of graphs.
         """
+        def generate_graph(size):
+            """Generates a graph and returns it as a JSON object."""
+            graph = utils.create_graph_v4(size, k)
+            adjacency_list = {node: list(graph.neighbors(node)) for node in graph.nodes}
+            node_weights = [graph.nodes[node]['weight'] for node in graph.nodes]
+            return {
+                "graph_name": f"graph_size_{size}_{k}",
+                "size": size,
+                "adjacency_list": adjacency_list,
+                "node_weights": node_weights
+            }
+
+        # Define sizes
+        sizes = list(range(step, n + 1, step))
+
+        
+        # Progress bar setup
+        print("Starting graph generation...")
+        graph_data = []
+
+        with tqdm(total=len(sizes), desc=f"Generating Graphs for k={k}", unit="graph") as pbar:
+            with ThreadPoolExecutor(max_workers=num_threads) as executor:
+                # Submit tasks for all sizes, respecting the timeout flag
+                futures = {}
+                for size in sizes:
+                    future = executor.submit(generate_graph, size)
+                    futures[future] = size
+
+                # Process completed futures
+                for future in futures:
+                    try:
+                        graph_json = future.result()
+                        graph_data.append(graph_json)
+                    except Exception as e:
+                        print(f"Graph generation failed for size {futures[future]}: {e}")
+                    finally:
+                        pbar.update(1)
 
         if save_data:
             # Ensure the output directory exists
             os.makedirs(save_data['output_dir'], exist_ok=True)
+            output_filename = os.path.join(save_data['output_dir'], f"{save_data['file_name']}_{k}.jsonl")
             
-            # File to store all graphs for the given k
-            output_filename = os.path.join(save_data['output_dir'], f"{save_data['file_name']}_k_{k}.pkl")
-        
-        # Define sizes from 0 to n, in increments of step
-        sizes = range(step, n + 1, step)
-        
-        # Create a dictionary to store the graphs
-        graph_data = {}
-        
-        # Generate graphs with tqdm progress bar
-        print("Starting graph generation...")
-        with tqdm(total=len(sizes), desc=f"Generating Graphs for k={k}", unit="graph") as pbar:
-            for size in sizes:
-                graph_data[size] = utils.create_graph_v4(size, k)
-                pbar.update(1)  # Update the progress bar after each iteration
-
-        if save_data:
-            # Save all the graphs to a file (overwrite the file)
-            with open(output_filename, 'wb') as f:
-                pickle.dump(graph_data, f)
+            # Write all graphs to JSONL file
+            with open(output_filename, 'w') as file:
+                for graph_json in graph_data:
+                    file.write(json.dumps(graph_json) + '\n')
             
             print("All graphs generated and saved.")
             return output_filename
-        
+
         print("All graphs generated.")
         return graph_data
+    
+    @staticmethod
+    def create_graph_from_txt_to_jsonl(file_path='../graphs/test_graph.txt', graph_name="test_graph"):
+        """
+        Reads a graph from a text file and returns a JSONL line representation
+        with adjacency list, node weights, and graph name.
+
+        Args:
+            file_path (str): Path to the input text file.
+            graph_name (str): Name of the graph.
+
+        Returns:
+            str: A JSON-formatted string representing the graph in JSONL format.
+        """
+        with open(file_path, 'r') as f:
+            # Read the file and split into lines
+            lines = f.readlines()
+            
+            # Parse number of nodes and edges
+            num_nodes = int(lines[0].strip())
+            num_edges = int(lines[1].strip())
+            
+            # Parse the adjacency list
+            adjacency_list = {i: [] for i in range(num_nodes)}
+            for line in lines[2:]:
+                u, v = map(int, line.strip().split())
+                adjacency_list[u].append(v)
+                adjacency_list[v].append(u)
+            
+            # Generate random weights for each node
+            rand_instance = random.Random(108122)
+            weights = [rand_instance.randint(1, 100) for _ in range(num_nodes)]
+            
+            # Construct the JSON object
+            graph_data = {
+                "graph_name": graph_name,
+                "adjacency_list": adjacency_list,
+                "node_weights": weights
+            }
+            
+            # Return as a JSONL-compatible string
+            return json.dumps(graph_data)
 
     @staticmethod
     def load_graphs(filename):
@@ -95,7 +159,6 @@ class utils:
                 graph_data.append(json.loads(line.strip()))
         return graph_data
 
-    
     @staticmethod
     # Function to generate all subsets of a given set
     def all_subsets(s):
@@ -106,7 +169,7 @@ class utils:
     def is_independent_set(G, subset):
         for u, v in itertools.combinations(subset, 2):
             if G.has_edge(u, v):
-                return False
+                return False;
         return True
 
     @staticmethod
@@ -279,50 +342,6 @@ class utils:
         plt.show()
 
     @staticmethod
-    def create_graph_jsonl(file_path='../graphs/test_graph.txt', graph_name="test_graph"):
-        """
-        Reads a graph from a text file and returns a JSONL line representation
-        with adjacency matrix, node weights, and graph name.
-
-        Args:
-            file_path (str): Path to the input text file.
-            graph_name (str): Name of the graph.
-
-        Returns:
-            str: A JSON-formatted string representing the graph in JSONL format.
-        """
-        with open(file_path, 'r') as f:
-            # Read the file and split into lines
-            lines = f.readlines()
-            
-            # Parse number of nodes and edges
-            num_nodes = int(lines[0].strip())
-            num_edges = int(lines[1].strip())
-            
-            # Parse the adjacency matrix
-            adjacency_matrix = []
-            for line in lines[2:]:
-                adjacency_matrix.append([int(x) for x in line.strip().split()])
-            
-            # Ensure the adjacency matrix dimensions are correct
-            if len(adjacency_matrix) != num_nodes or any(len(row) != num_nodes for row in adjacency_matrix):
-                raise ValueError("Adjacency matrix dimensions do not match the number of nodes")
-            
-            # Generate random weights for each node
-            rand_instance = random.Random(108122)
-            weights = [rand_instance.randint(1, 100) for _ in range(num_nodes)]
-            
-            # Construct the JSON object
-            graph_data = {
-                "graph_name": graph_name,
-                "adjacency_matrix": adjacency_matrix,
-                "node_weights": weights
-            }
-            
-            # Return as a JSONL-compatible string
-            return json.dumps(graph_data)
-
-    @staticmethod
     def graphs_txt_to_jsonl(input_dir='../graphs/graph_dataset', output_filename='../graphs/graph_dataset.jsonl'):
         """
         Convert a dataset of graphs stored in text files to a single JSON Lines file.
@@ -377,4 +396,3 @@ class utils:
         
         # Convert the dictionary to a pandas Series
         return pd.Series(average_values)
-        

@@ -1,5 +1,5 @@
 from algorithms import algorithms
-from scipy.stats import rankdata
+#from scipy.stats import rankdata
 import matplotlib.pyplot as plt
 from constants import *
 from utils import utils
@@ -302,7 +302,8 @@ def exhaustive_vs_greedy_size_weight():
         size_ranks = np.zeros((4, space))
         weight_ranks = np.zeros((4, space))
         speed_ranks = np.zeros((4, space))
-
+        
+        """
         # Calculate ranks per graph instance, handling ties
         for i in range(space):
             solution_sizes = [dataframes[algorithm][k][SOLUTION_SIZE][i] for algorithm in ALGORITHMS[1:]]
@@ -318,7 +319,8 @@ def exhaustive_vs_greedy_size_weight():
         size_ranks = np.mean(size_ranks, axis=1)
         weight_ranks = np.mean(weight_ranks, axis=1)
         speed_ranks = np.mean(speed_ranks, axis=1)
-
+        """
+        
         # Prepare ranking table data for current k
         ranking_data_k = {
             'Algorithm': ALGORITHMS[1:],
@@ -469,7 +471,7 @@ def comparison_operations_time():
     and Monte Carlo algorithms (Fig.4 extended).
     """
 
-    space = len(dataframes_randomized[HEURISTIC_MONTE_CARLO][125][25])
+    space = len(dataframes_randomized[THREADED_HEURISTIC_MONTE_CARLO][125][25])
     
     def extract_data_avg():
         """ Extract and calculate average data for all algorithms. """
@@ -483,7 +485,7 @@ def comparison_operations_time():
                 SMALLEST_DEGREE_FIRST, 
                 WEIGHT_TO_DEGREE, 
                 MONTE_CARLO, 
-                HEURISTIC_MONTE_CARLO
+                THREADED_HEURISTIC_MONTE_CARLO
             ]
         ]
 
@@ -499,7 +501,7 @@ def comparison_operations_time():
     titles = ['Average Number of Operations', 'Average Execution Time (s)']
     y_labels = [NUMBER_OF_OPERATIONS, ]
     data = [avg_ops, avg_time]
-    labels = [WMAX, DMIN, WDMIX, MONTE_CARLO, HEURISTIC_MONTE_CARLO]
+    labels = [WMAX, DMIN, WDMIX, MONTE_CARLO, THREADED_HEURISTIC_MONTE_CARLO]
 
     # Define unique colors for all algorithms
     algorithm_colors = [
@@ -523,84 +525,84 @@ def comparison_operations_time():
     # Log the conclusion of the function
     print("comparison_operations_time() - Done")
     
-def exhaustive_vs_algorithms_size_weight():
-    """ 
-    Compare the solution size and total weight of the greedy and Monte Carlo algorithms 
-    with the exhaustive algorithm (Fig.6 Extended). 
-    Also generates the tables for the ranking of all algorithms (Tables 1 and 2 Extended).
-    """
-    
-    chosen_iterations = 250
-
-    # Create a figure with subplots
-    _, axes = plt.subplots(4, 2, figsize=(15, 20), constrained_layout=True)
-    
-    # Loop over each k value
-    for idx, k in enumerate(k_values):
-        
-        space = len(dataframes[EXHAUSTIVE][k])
-
-        # Plot Solution Size and Total Weight for each algorithm
-        for algorithm in ALGORITHMS[1:] + RANDOMIZED_ALGORITHMS:
-            alpha_value = 0.30 if algorithm != EXHAUSTIVE else 1
-            dataframe = dataframes[algorithm][k] if algorithm not in RANDOMIZED_ALGORITHMS else dataframes_randomized[algorithm][k][chosen_iterations]
-            dataframe[SOLUTION_SIZE].head(space).plot(ax=axes[idx, 0], label=LABELS[algorithm], color=colors[algorithm], alpha=alpha_value)
-            dataframe[TOTAL_WEIGHT].head(space).plot(ax=axes[idx, 1], label=LABELS[algorithm], color=colors[algorithm], alpha=alpha_value)
-        
-        # Set labels for Solution Size plot
-        axes[idx, 0].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
-        axes[idx, 0].set_ylabel(SOLUTION_SIZE, fontsize=8)
-        axes[idx, 0].set_title(f'Solution Size for k={k}', fontsize=10)
-        axes[idx, 0].legend(fontsize=7, loc=UPPER_LEFT)
-
-        # Set labels for Total Weight plot
-        axes[idx, 1].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
-        axes[idx, 1].set_ylabel(TOTAL_WEIGHT, fontsize=8)
-        axes[idx, 1].set_title(f'Total Weight of Solution for k={k}', fontsize=10)
-        axes[idx, 1].legend(fontsize=7, loc=UPPER_LEFT)
-        
-        # Initialize arrays for rankings
-        size_ranks = np.zeros((len(ALGORITHMS[1:]) + 2, space))  # Including Monte Carlo algorithms
-        weight_ranks = np.zeros((len(ALGORITHMS[1:]) + 2, space))
-        speed_ranks = np.zeros((len(ALGORITHMS[1:]) + 2, space))
-
-        # Calculate ranks per graph instance, handling ties
-        for i in range(space):
-            solution_sizes = [dataframes[algorithm][k][SOLUTION_SIZE][i] for algorithm in ALGORITHMS[1:]] + [dataframes_randomized[algorithm][k][chosen_iterations][SOLUTION_SIZE][i] for algorithm in RANDOMIZED_ALGORITHMS]
-            solution_weights = [dataframes[algorithm][k][TOTAL_WEIGHT][i] for algorithm in ALGORITHMS[1:]] + [dataframes_randomized[algorithm][k][chosen_iterations][TOTAL_WEIGHT][i] for algorithm in RANDOMIZED_ALGORITHMS]
-            solution_speeds = [dataframes[algorithm][k][EXECUTION_TIME][i] for algorithm in ALGORITHMS[1:]] + [dataframes_randomized[algorithm][k][chosen_iterations][EXECUTION_TIME][i] for algorithm in RANDOMIZED_ALGORITHMS]
-            
-            # Use rankdata with 'min' to rank from largest to smallest (1 is best, N is worst)
-            size_ranks[:, i] = 1 + len(solution_sizes) - rankdata(solution_sizes, method='max')
-            weight_ranks[:, i] = 1 + len(solution_weights) - rankdata(solution_weights, method='max')
-            speed_ranks[:, i] = rankdata(solution_speeds, method='min')
-        
-        # Calculate mean ranks across all graph sizes
-        size_ranks = np.mean(size_ranks, axis=1)
-        weight_ranks = np.mean(weight_ranks, axis=1)
-        speed_ranks = np.mean(speed_ranks, axis=1)
-
-        # Prepare ranking table data for current k
-        ranking_data_k = {
-            'Algorithm': ALGORITHMS[1:] + RANDOMIZED_ALGORITHMS,
-            'Solution Size Rank': np.round(size_ranks, 2),
-            'Total Weight Rank': np.round(weight_ranks, 2),
-            'Speed Rank': np.round(speed_ranks, 2),
-            'Average Rank': np.round((size_ranks + weight_ranks + speed_ranks) / 3, 2)
-        }
-        ranking_df_k = pd.DataFrame(ranking_data_k).set_index('Algorithm')
-        ranking_df_k = ranking_df_k.sort_values(by='Average Rank')
-
-        # Save table data to CSV
-        ranking_df_k.to_csv(f'../data/ranking_table_k_{k}_extended.csv')
-
-    # Save the main figure with all plots
-    plt.tight_layout(pad=1.0)
-    plt.savefig('../images/solution_size_weight_comparison_all_extended.png', dpi=300)
-    plt.close()
-    
-    # Log the conclusion of the function
-    print("exhaustive_vs_algorithms_size_weight() - Done")
+#def exhaustive_vs_algorithms_size_weight():
+#    """ 
+#    Compare the solution size and total weight of the greedy and Monte Carlo algorithms 
+#    with the exhaustive algorithm (Fig.6 Extended). 
+#    Also generates the tables for the ranking of all algorithms (Tables 1 and 2 Extended).
+#    """
+#    
+#    chosen_iterations = 250
+#
+#    # Create a figure with subplots
+#    _, axes = plt.subplots(4, 2, figsize=(15, 20), constrained_layout=True)
+#    
+#    # Loop over each k value
+#    for idx, k in enumerate(k_values):
+#        
+#        space = len(dataframes[EXHAUSTIVE][k])
+#
+#        # Plot Solution Size and Total Weight for each algorithm
+#        for algorithm in ALGORITHMS[1:] + RANDOMIZED_ALGORITHMS:
+#            alpha_value = 0.30 if algorithm != EXHAUSTIVE else 1
+#            dataframe = dataframes[algorithm][k] if algorithm not in RANDOMIZED_ALGORITHMS else dataframes_randomized[algorithm][k][chosen_iterations]
+#            dataframe[SOLUTION_SIZE].head(space).plot(ax=axes[idx, 0], label=LABELS[algorithm], color=colors[algorithm], alpha=alpha_value)
+#            dataframe[TOTAL_WEIGHT].head(space).plot(ax=axes[idx, 1], label=LABELS[algorithm], color=colors[algorithm], alpha=alpha_value)
+#        
+#        # Set labels for Solution Size plot
+#        axes[idx, 0].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
+#        axes[idx, 0].set_ylabel(SOLUTION_SIZE, fontsize=8)
+#        axes[idx, 0].set_title(f'Solution Size for k={k}', fontsize=10)
+#        axes[idx, 0].legend(fontsize=7, loc=UPPER_LEFT)
+#
+#        # Set labels for Total Weight plot
+#        axes[idx, 1].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
+#        axes[idx, 1].set_ylabel(TOTAL_WEIGHT, fontsize=8)
+#        axes[idx, 1].set_title(f'Total Weight of Solution for k={k}', fontsize=10)
+#        axes[idx, 1].legend(fontsize=7, loc=UPPER_LEFT)
+#        
+#        # Initialize arrays for rankings
+#        size_ranks = np.zeros((len(ALGORITHMS[1:]) + 2, space))  # Including Monte Carlo algorithms
+#        weight_ranks = np.zeros((len(ALGORITHMS[1:]) + 2, space))
+#        speed_ranks = np.zeros((len(ALGORITHMS[1:]) + 2, space))
+#
+#        # Calculate ranks per graph instance, handling ties
+#        for i in range(space):
+#            solution_sizes = [dataframes[algorithm][k][SOLUTION_SIZE][i] for algorithm in ALGORITHMS[1:]] + [dataframes_randomized[algorithm][k][chosen_iterations][SOLUTION_SIZE][i] for algorithm in RANDOMIZED_ALGORITHMS]
+#            solution_weights = [dataframes[algorithm][k][TOTAL_WEIGHT][i] for algorithm in ALGORITHMS[1:]] + [dataframes_randomized[algorithm][k][chosen_iterations][TOTAL_WEIGHT][i] for algorithm in RANDOMIZED_ALGORITHMS]
+#            solution_speeds = [dataframes[algorithm][k][EXECUTION_TIME][i] for algorithm in ALGORITHMS[1:]] + [dataframes_randomized[algorithm][k][chosen_iterations][EXECUTION_TIME][i] for algorithm in RANDOMIZED_ALGORITHMS]
+#            
+#            # Use rankdata with 'min' to rank from largest to smallest (1 is best, N is worst)
+#            size_ranks[:, i] = 1 + len(solution_sizes) - rankdata(solution_sizes, method='max')
+#            weight_ranks[:, i] = 1 + len(solution_weights) - rankdata(solution_weights, method='max')
+#            speed_ranks[:, i] = rankdata(solution_speeds, method='min')
+#        
+#        # Calculate mean ranks across all graph sizes
+#        size_ranks = np.mean(size_ranks, axis=1)
+#        weight_ranks = np.mean(weight_ranks, axis=1)
+#        speed_ranks = np.mean(speed_ranks, axis=1)
+#
+#        # Prepare ranking table data for current k
+#        ranking_data_k = {
+#            'Algorithm': ALGORITHMS[1:] + RANDOMIZED_ALGORITHMS,
+#            'Solution Size Rank': np.round(size_ranks, 2),
+#            'Total Weight Rank': np.round(weight_ranks, 2),
+#            'Speed Rank': np.round(speed_ranks, 2),
+#            'Average Rank': np.round((size_ranks + weight_ranks + speed_ranks) / 3, 2)
+#        }
+#        ranking_df_k = pd.DataFrame(ranking_data_k).set_index('Algorithm')
+#        ranking_df_k = ranking_df_k.sort_values(by='Average Rank')
+#
+#        # Save table data to CSV
+#        ranking_df_k.to_csv(f'../data/ranking_table_k_{k}_extended.csv')
+#
+#    # Save the main figure with all plots
+#    plt.tight_layout(pad=1.0)
+#    plt.savefig('../images/solution_size_weight_comparison_all_extended.png', dpi=300)
+#    plt.close()
+#    
+#    # Log the conclusion of the function
+#    print("exhaustive_vs_algorithms_size_weight() - Done")
 
 def quick_algo_graph(algorithm, filename):
     """ 
