@@ -8,30 +8,32 @@ import numpy as np
 import matplotlib
 
 # Load dataframes for each algorithm and k value
-dataframes = {
-    OLD_EXHAUSTIVE: {k: pd.read_csv(OLD_EXHAUSTIVE_PATH.format(k)) for k in k_values},
-    EXHAUSTIVE: {k: pd.read_csv(EXHAUSTIVE_PATH.format(k)) for k in k_values},
-    BIGGEST_WEIGHT_FIRST: {k: pd.read_csv(BIGGEST_WEIGHT_FIRST_PATH.format(k)) for k in k_values},
-    SMALLEST_DEGREE_FIRST: {k: pd.read_csv(SMALLEST_DEGREE_FIRST_PATH.format(k)) for k in k_values},
-    WEIGHT_TO_DEGREE: {k: pd.read_csv(WEIGHT_TO_DEGREE_PATH.format(k)) for k in k_values},
+dataframes_small = {
+    OLD_EXHAUSTIVE: {k: pd.read_csv(OLD_EXHAUSTIVE_PATH.format(k)) for k in k_full},
+    EXHAUSTIVE: {k: pd.read_csv(EXHAUSTIVE_PATH.format(k)) for k in k_full},
+    BIGGEST_WEIGHT_FIRST: {k: pd.read_csv(BIGGEST_WEIGHT_FIRST_PATH.format(SMALL,k)) for k in k_full},
+    SMALLEST_DEGREE_FIRST: {k: pd.read_csv(SMALLEST_DEGREE_FIRST_PATH.format(SMALL,k)) for k in k_full},
+    WEIGHT_TO_DEGREE: {k: pd.read_csv(WEIGHT_TO_DEGREE_PATH.format(SMALL,k)) for k in k_full},
+    MONTE_CARLO: {k: pd.read_csv(MONTE_CARLO_PATH.format(SMALL,k)) for k in k_full},
+    PARALLEL_HEURISTIC_MONTE_CARLO: {k: pd.read_csv(PARALLEL_HEURISTIC_MONTE_CARLO_PATH.format(SMALL,k)) for k in k_full}, 
+    SIMULATED_ANNEALING: {k: pd.read_csv(SIMULATED_ANNEALING_PATH.format(SMALL,k)) for k in k_full}   
 }
 
-dataframes_randomized = {
-    MONTE_CARLO: {k: {i: pd.read_csv(MONTE_CARLO_PATH.format(k, i)) for i in iterations} for k in k_values},
-    THREADED_HEURISTIC_MONTE_CARLO: {k: {i: pd.read_csv(HEURISTIC_MONTE_CARLO_PATH.format(k, i)) for i in iterations} for k in k_values}
+dataframes_big = {
+    BIGGEST_WEIGHT_FIRST: {k: pd.read_csv(BIGGEST_WEIGHT_FIRST_PATH.format(BIG,k)) for k in k_full},
+    SMALLEST_DEGREE_FIRST: {k: pd.read_csv(SMALLEST_DEGREE_FIRST_PATH.format(BIG,k)) for k in k_full},
+    WEIGHT_TO_DEGREE: {k: pd.read_csv(WEIGHT_TO_DEGREE_PATH.format(BIG,k)) for k in k_full},
+    MONTE_CARLO: {k: pd.read_csv(MONTE_CARLO_PATH.format(BIG,k)) for k in k_full},
+    PARALLEL_HEURISTIC_MONTE_CARLO: {k: pd.read_csv(PARALLEL_HEURISTIC_MONTE_CARLO_PATH.format(BIG,k)) for k in k_full}, 
+    SIMULATED_ANNEALING: {k: pd.read_csv(SIMULATED_ANNEALING_PATH.format(BIG,k)) for k in k_full}   
 }
 
-dataframes_heuristic_full = {
-    BIGGEST_WEIGHT_FIRST: {k: pd.read_csv(FULL_BIGGEST_WEIGHT_FIRST_PATH.format(k)) for k in k_values},
-    SMALLEST_DEGREE_FIRST: {k: pd.read_csv(FULL_SMALLEST_DEGREE_FIRST_PATH.format(k)) for k in k_values},
-    WEIGHT_TO_DEGREE: {k: pd.read_csv(FULL_WEIGHT_TO_DEGREE_PATH.format(k)) for k in k_values}
-}
-
-# Add 'Solution_Size' column to all dataframes
-for algorithm, dfs in dataframes.items():
-    for k, df in dfs.items():
-        df[SOLUTION_SIZE] = df['Solution'].apply(lambda x: len(x.split(',')))
-        
+dataframes_pregen = {
+    WEIGHT_TO_DEGREE: pd.read_csv(PREGEN_WEIGHT_TO_DEGREE_PATH),
+    MONTE_CARLO: pd.read_csv(PREGEN_MONTE_CARLO_PATH),
+    PARALLEL_HEURISTIC_MONTE_CARLO: pd.read_csv(PREGEN_PARALLEL_HEURISTIC_MONTE_CARLO_PATH),
+    SIMULATED_ANNEALING: pd.read_csv(PREGEN_SIMULATED_ANNEALING_PATH)
+}  
         
 """ ----- Helper Functions ----- """
 
@@ -471,7 +473,7 @@ def comparison_operations_time():
     and Monte Carlo algorithms (Fig.4 extended).
     """
 
-    space = len(dataframes_randomized[THREADED_HEURISTIC_MONTE_CARLO][125][25])
+    space = len(dataframes_randomized[PARALLEL_HEURISTIC_MONTE_CARLO][125][25])
     
     def extract_data_avg():
         """ Extract and calculate average data for all algorithms. """
@@ -485,7 +487,7 @@ def comparison_operations_time():
                 SMALLEST_DEGREE_FIRST, 
                 WEIGHT_TO_DEGREE, 
                 MONTE_CARLO, 
-                THREADED_HEURISTIC_MONTE_CARLO
+                PARALLEL_HEURISTIC_MONTE_CARLO
             ]
         ]
 
@@ -501,7 +503,7 @@ def comparison_operations_time():
     titles = ['Average Number of Operations', 'Average Execution Time (s)']
     y_labels = [NUMBER_OF_OPERATIONS, ]
     data = [avg_ops, avg_time]
-    labels = [WMAX, DMIN, WDMIX, MONTE_CARLO, THREADED_HEURISTIC_MONTE_CARLO]
+    labels = [WMAX, DMIN, WDMIX, MONTE_CARLO, PARALLEL_HEURISTIC_MONTE_CARLO]
 
     # Define unique colors for all algorithms
     algorithm_colors = [
@@ -653,7 +655,7 @@ def quick_algo_graph(algorithm, filename):
     plt.savefig(DATA_FOLDER + filename.replace('.csv', '.png'), dpi=300)
     plt.close()
 
-def quick_algo_compare_graphs(algorithms, filenames, output_filename='../images/quick_comparison.png'):
+def quick_algo_compare_graphs(algorithms, dataset=SMALL, k=None, output_filename='../images/quick_comparison.png'):
     """ 
     Create a quick comparison graph for the specified algorithms and save it to the given filename. 
     This is a helper function to quickly visualize the results of multiple algorithms. 
@@ -669,9 +671,22 @@ def quick_algo_compare_graphs(algorithms, filenames, output_filename='../images/
     # Attribute a color to each algorithm
     colors = ['red', 'blue', 'green', 'purple', 'orange', 'cyan']
     
+    # Set plot labels and titles
+    
     for i, algorithm in enumerate(algorithms):
-        temp_df = pd.read_csv(DATA_FOLDER + filenames[i])
-        x_values = temp_df[NODE_COUNT]
+        if dataset == SMALL:
+            temp_df = dataframes_small[algorithm]
+        elif dataset == BIG:
+            temp_df = dataframes_big[algorithm]
+        elif dataset == PREGEN:
+            temp_df = dataframes_pregen[algorithm]
+
+        x_values = temp_df[k if k else 0.75][NODE_COUNT]
+        
+        if k:
+            temp_df = temp_df[k]
+        else:
+            temp_df = utils.total_average(temp_df)
 
         # Plot Solution Size and Total Weight for the algorithm
         axes[0][0].plot(x_values, temp_df[SOLUTION_SIZE], label=algorithm, color=colors[i])
@@ -706,11 +721,5 @@ def quick_algo_compare_graphs(algorithms, filenames, output_filename='../images/
     plt.close()
 
 if __name__ == "__main__":
-    remarks_graphs()
-    exhaustive_comparison_operations()
-    exhaustive_vs_greedy_size_weight()
-    greedy_comparison_operations_time()
-    solution_comparison()
-    exhaustive_vs_greedy_error_ratio_and_accuracy()
-    monte_carlo_precision()
-    comparison_operations_time()
+    # Compare the graphs of the exhaustive, weighted to degree, and all randomized algorithms, using the small dataset    
+    quick_algo_compare_graphs([EXHAUSTIVE, WEIGHT_TO_DEGREE, MONTE_CARLO, PARALLEL_HEURISTIC_MONTE_CARLO, SIMULATED_ANNEALING], dataset=SMALL, k=0.5, output_filename='../images/quick_comparison_small.png')

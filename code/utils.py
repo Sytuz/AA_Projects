@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import matplotlib.pyplot as plt
-from constants import k_values
+from constants import k_values, TOTAL_WEIGHT, NODE_COUNT, SOLUTION_SIZE, EXECUTION_TIME, NUMBER_OF_OPERATIONS
 import networkx as nx
 from tqdm import tqdm
 import pandas as pd
@@ -370,7 +370,7 @@ class utils:
         print(f"Graph dataset saved to {output_filename}")
         
     @staticmethod
-    def results_average(foldername, k_vals=k_values, metric='Total Weight'):
+    def results_average(foldername, k_vals=k_values, metric='Total Weight', ):
         """
         Calculate the average metric value for each graph size in the results DataFrame.
 
@@ -396,3 +396,32 @@ class utils:
         
         # Convert the dictionary to a pandas Series
         return pd.Series(average_values)
+    
+    @staticmethod
+    def total_average(dataframes, metrics=[SOLUTION_SIZE, TOTAL_WEIGHT, EXECUTION_TIME, NUMBER_OF_OPERATIONS]):
+        """
+        Calculate the total average of the metrics for the algorithm, merging all k values, for every graph size.
+        
+        Parameters:
+        - dataframes (dict): Dictionary of DataFrames for the algorithm.
+        - metrics (list): List of metrics to calculate the average.
+        
+        Returns:
+        - pd.DataFrame: DataFrame containing the total average of the metrics.
+        """
+        # Initialize an empty list to store all DataFrames after grouping by 'Node Count'
+        grouped_dataframes = []
+
+        # Loop through each DataFrame in the dictionary
+        for k, df in dataframes.items():
+            # Group the DataFrame by 'Node Count' and calculate the mean for each metric
+            grouped = df.groupby('Node Count')[metrics].mean()
+            grouped_dataframes.append(grouped)
+
+        # Concatenate all grouped DataFrames into one, aligning by 'Node Count'
+        concatenated = pd.concat(grouped_dataframes)
+
+        # Calculate the mean across all k values for each metric
+        averaged = concatenated.groupby('Node Count').mean().reset_index()
+
+        return averaged

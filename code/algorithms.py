@@ -168,6 +168,9 @@ class algorithms:
         isolated_nodes = {node for node in G.nodes if G.degree(node) == 0}
         ops += len(G.nodes)  # Increment for isolated nodes
         
+        initial_weight = sum(G.nodes[node]['weight'] for node in isolated_nodes)
+        ops += len(isolated_nodes)  # Increment for initial weight calculation
+        
         nodes = list(set(G.nodes) - isolated_nodes)
 
         for _ in range(iterations):
@@ -176,7 +179,8 @@ class algorithms:
 
             # Deterministically solve for the current order
             current_set = set(isolated_nodes)
-            current_weight = 0
+            current_weight = initial_weight
+            
             excluded_nodes = set()
 
             for node in nodes:
@@ -205,89 +209,67 @@ class algorithms:
         return best_set, ops
     
     @staticmethod
-    def simulated_annealing(G, iterations=1000, initial_temp=100, cooling_rate=0.99):
+    def simulated_annealing(G, iterations=1000, cooling_rate=0.99):
         """
         Optimized Simulated Annealing algorithm to solve the MWIS problem.
-
+        
         Args:
             G: A graph with weights on nodes.
             iterations: Number of iterations for refinement.
-            initial_temp: Initial temperature for the annealing process.
             cooling_rate: Rate at which the temperature cools down.
-
+        
         Returns:
             A tuple of the best independent set found and the operation count.
         """
-        
         ops = 0  # Operation count
-                
-        conflict_nodes = set() # Track nodes that are adjacent to the current solution
+        initial_temp = iterations  # Initial temperature based on the number of iterations
 
-        def add_node_to_solution(solution, node):
-            """Add a node to the solution and update conflict_nodes."""
-            nonlocal ops
-            
-            solution.add(node)
-            ops += 1  # Increment for adding a node to the solution
-            
-            conflict_nodes.update(G.neighbors(node))
-            ops += len(list(G.neighbors(node)))  # Increment for updating neighbors
-            
-            conflict_nodes.add(node)
-            ops += 1  # Increment for adding the node itself to conflicts
+        def is_independent(solution, node):
+            """Check if adding a node keeps the solution independent."""
+            return all(neighbor not in solution for neighbor in G.neighbors(node))
 
-        def remove_node_from_solution(solution, node):
-            """Remove a node from the solution and update conflict_nodes."""
+        def calculate_weight(solution):
+            """Calculate the total weight of a solution."""
             nonlocal ops
-            
-            solution.remove(node)
-            ops += 1  # Increment for removing a node from the solution
-            
-            conflict_nodes.difference_update(G.neighbors(node))
-            ops += len(list(G.neighbors(node)))  # Increment for updating neighbors
-            
-            conflict_nodes.discard(node)
-            ops += 1  # Increment for removing the node itself from conflicts
-            
-        def get_add_candidates(solution):
-            """Return nodes that can be added to the solution."""
-            return set(G.nodes) - solution - conflict_nodes
-        
-        def calculate_weight(independent_set):
-            """Calculate the total weight of a set."""
-            nonlocal ops
-            ops += len(independent_set)  # Increment for weight calculation
-            return sum(G.nodes[node]['weight'] for node in independent_set)
-        
+            ops += len(solution)  # Increment for weight calculation
+            return sum(G.nodes[node]['weight'] for node in solution)
+
         def get_random_neighbor(solution):
-            if random.random() < 0.5:
-                # Attempt to add a node
-                candidates = get_add_candidates(solution)
+            """Generate a random neighbor by adding or removing a node."""
+            nonlocal ops
+
+            if random.random() < 0.5:  # Try adding a random valid node
+                candidates = [node for node in G.nodes if node not in solution and is_independent(solution, node)]
                 if candidates:
-                    node_to_add = random.choice(list(candidates))
-                    add_node_to_solution(solution, node_to_add)
-            else:
-                # Attempt to remove a node
+                    node_to_add = random.choice(candidates)
+                    solution.add(node_to_add)
+                    ops += 1  # Increment for adding a node
+            else:  # Try removing a random node
                 if solution:
                     node_to_remove = random.choice(list(solution))
-                    remove_node_from_solution(solution, node_to_remove)
+                    solution.remove(node_to_remove)
+                    ops += 1  # Increment for removing a node
+            
             return solution
 
-        # Initialize with a greedy independent set without sorting
-        current_set, init_ops = algorithms.monte_carlo(G, 1)
-        ops += init_ops  # Increment for initializing the current set
-        
+        # Initialize with a greedy independent set
+        current_set, init_ops = algorithms.monte_carlo(G, 1)  # Replace this with your greedy algorithm
+        ops += init_ops
         current_weight = calculate_weight(current_set)
-        best_set = current_set
+
+        # Initialize best solution
+        best_set = set(current_set)
         best_weight = current_weight
 
+        # Set the initial temperature
         temp = initial_temp
 
+        # Simulated Annealing loop
         for _ in range(iterations):
             ops += 1  # Increment for each iteration
 
             # Generate a random neighbor
-            new_set = get_random_neighbor(current_set)
+            new_set = get_random_neighbor(set(current_set))  # Create a copy of the current set
             new_weight = calculate_weight(new_set)
 
             # Decide whether to accept the new solution
@@ -296,19 +278,18 @@ class algorithms:
                 current_weight = new_weight
                 ops += 2  # Increment for accepting a new solution
 
-
             # Update the best solution if needed
             if current_weight > best_weight:
-                best_set = current_set
+                best_set = set(current_set)
                 best_weight = current_weight
                 ops += 2  # Increment for updating the best solution
 
             # Cool down the temperature
             temp *= cooling_rate
-            ops += 1 # Increment for cooling down the temperature
+            ops += 1  # Increment for cooling down the temperature
 
-        return best_set, ops
-    
+        return best_set, ops   
+ 
     @staticmethod
     def heuristic_monte_carlo_worker_thread(G, isolated_nodes, weight_degree_ratio, probabilities, iterations):
         """
@@ -317,11 +298,13 @@ class algorithms:
         best_set = set()
         best_weight = 0
         ops = 0
+        
+        initial_weight = sum(G.nodes[node]['weight'] for node in isolated_nodes)
+        ops += len(isolated_nodes) # Increment for isolated nodes
 
         for _ in range(iterations):
             current_set = set(isolated_nodes)
-            current_weight = sum(G.nodes[node]['weight'] for node in isolated_nodes)
-            ops += len(isolated_nodes) # Increment for isolated nodes
+            current_weight = initial_weight
             
             shuffled_nodes = random.choices(
                 [node for node, _ in weight_degree_ratio],

@@ -129,11 +129,16 @@ class stressTester:
                         # Load the graph data from the current JSONL line
                         graph_data = json.loads(line)
                         graph_name = graph_data.get('graph_name', None)
-                        adjacency_list = graph_data['adjacency_list']
+                        try:
+                            adjacency_list = graph_data['adjacency_list']
+                            
+                            # Convert keys of adjacency list to integers
+                            adjacency_list = {int(k): v for k, v in adjacency_list.items()}
+                        except KeyError:
+                            adjacency_list = graph_data['adjacency_matrix']
+                            adjacency_list = np.array(adjacency_list)
+                            
                         node_weights = graph_data['node_weights']
-
-                        # Convert keys of adjacency list to integers
-                        adjacency_list = {int(k): v for k, v in adjacency_list.items()}
 
                         # Reconstruct the graph using networkx
                         G = nx.Graph(adjacency_list)

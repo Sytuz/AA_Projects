@@ -5,19 +5,26 @@ k_values = [125, 25, 50, 75]
 iterations = [25, 50, 100, 250, 500, 750, 1000]
 
 # File paths for the data
-OLD_EXHAUSTIVE_PATH = "../data/exhaustive_v1/exhaustive_v1_p_{}.csv"
-EXHAUSTIVE_PATH = "../data/exhaustive/exhaustive_p_{}.csv"
-BIGGEST_WEIGHT_FIRST_PATH = "../data/biggest_weight_first_compare/biggest_weight_first_compare_p_{}.csv"
-SMALLEST_DEGREE_FIRST_PATH = "../data/smallest_degree_first_compare/smallest_degree_first_compare_p_{}.csv"
-WEIGHT_TO_DEGREE_PATH = "../data/weight_to_degree_compare/weight_to_degree_compare_p_{}.csv"
-MONTE_CARLO_PATH = "../data/monte_carlo_compare/p_{}/results_{}.csv"
-HEURISTIC_MONTE_CARLO_PATH = "../data/heuristic_monte_carlo_compare/p_{}/results_{}.csv"
+OLD_EXHAUSTIVE_PATH = "../data/exhaustive_v1/results_{}.csv"
+EXHAUSTIVE_PATH = "../data/exhaustive/results_{}.csv"
+BIGGEST_WEIGHT_FIRST_PATH = "../data/biggest_weight_first/{}/results_{}.csv"
+SMALLEST_DEGREE_FIRST_PATH = "../data/smallest_degree_first/{}/results_{}.csv"
+WEIGHT_TO_DEGREE_PATH = "../data/weight_to_degree/{}/results_{}.csv"
+MONTE_CARLO_PATH = "../data/monte_carlo/{}/results_{}.csv"
+PARALLEL_HEURISTIC_MONTE_CARLO_PATH = "../data/parallel_heuristic_monte_carlo/{}/results_{}.csv"
+SIMULATED_ANNEALING_PATH = "../data/simulated_annealing/{}/results_{}.csv"
 
-FULL_BIGGEST_WEIGHT_FIRST_PATH = "../data/biggest_weight_first/biggest_weight_first_p_{}.csv"
-FULL_SMALLEST_DEGREE_FIRST_PATH = "../data/smallest_degree_first/smallest_degree_first_p_{}.csv"
-FULL_WEIGHT_TO_DEGREE_PATH = "../data/weight_to_degree/weight_to_degree_p_{}.csv"
+# Pregen data file paths
+PREGEN_WEIGHT_TO_DEGREE_PATH = "../data/weight_to_degree/pregen/results.csv"
+PREGEN_MONTE_CARLO_PATH = "../data/monte_carlo/pregen/results.csv"
+PREGEN_PARALLEL_HEURISTIC_MONTE_CARLO_PATH = "../data/parallel_heuristic_monte_carlo/pregen/results.csv"
+PREGEN_SIMULATED_ANNEALING_PATH = "../data/simulated_annealing/pregen/results.csv"
 
 DATA_FOLDER = "../data/"
+
+SMALL = "small"
+BIG = "big"
+PREGEN = 'pregen'
 
 # Constants used for the plots
 NODE_COUNT = 'Node Count'
@@ -36,12 +43,12 @@ BIGGEST_WEIGHT_FIRST = 'Biggest Weight First'
 SMALLEST_DEGREE_FIRST = 'Smallest Degree First'
 WEIGHT_TO_DEGREE = 'Weight to Degree'
 MONTE_CARLO = 'Monte Carlo'
-THREADED_HEURISTIC_MONTE_CARLO = 'Threaded Heuristic Monte Carlo'
+PARALLEL_HEURISTIC_MONTE_CARLO = 'Parallel Heuristic Monte Carlo'
 SIMULATED_ANNEALING = 'Simulated Annealing'
 
 ALGORITHMS = [OLD_EXHAUSTIVE, EXHAUSTIVE, BIGGEST_WEIGHT_FIRST, SMALLEST_DEGREE_FIRST, WEIGHT_TO_DEGREE]
 
-RANDOMIZED_ALGORITHMS = [MONTE_CARLO, THREADED_HEURISTIC_MONTE_CARLO, SIMULATED_ANNEALING]
+RANDOMIZED_ALGORITHMS = [MONTE_CARLO, PARALLEL_HEURISTIC_MONTE_CARLO, SIMULATED_ANNEALING]
 
 # Labels
 EXH = 'Exhaustive'
@@ -58,7 +65,7 @@ LABELS = {
     SMALLEST_DEGREE_FIRST: DMIN,
     WEIGHT_TO_DEGREE: WDMIX,
     MONTE_CARLO: MC,
-    THREADED_HEURISTIC_MONTE_CARLO: THMC,
+    PARALLEL_HEURISTIC_MONTE_CARLO: THMC,
     SIMULATED_ANNEALING: SA
 }
 
@@ -69,6 +76,6 @@ colors = {
     SMALLEST_DEGREE_FIRST: 'green',
     WEIGHT_TO_DEGREE: 'purple',
     MONTE_CARLO: 'blue',
-    THREADED_HEURISTIC_MONTE_CARLO: 'cyan',
+    PARALLEL_HEURISTIC_MONTE_CARLO: 'cyan',
     SIMULATED_ANNEALING: 'magenta'
 }
