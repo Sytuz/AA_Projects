@@ -1,9 +1,9 @@
 # Results
-*.csv
 *.pkl
 *.jsonl
 Grafo*.txt
-data/*/*.png
+data_backup*
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

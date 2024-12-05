@@ -19,6 +19,10 @@ dataframes_small = {
     SIMULATED_ANNEALING: {k: pd.read_csv(SIMULATED_ANNEALING_PATH.format(SMALL,k)) for k in k_full}   
 }
 
+# For the EXHAUSTIVE algorithm, for every k value, add a column with the solution size
+for k in k_full:
+    dataframes_small[EXHAUSTIVE][k][SOLUTION_SIZE] = dataframes_small[EXHAUSTIVE][k]['Solution'].apply(lambda x: len(eval(x)))
+
 dataframes_big = {
     BIGGEST_WEIGHT_FIRST: {k: pd.read_csv(BIGGEST_WEIGHT_FIRST_PATH.format(BIG,k)) for k in k_full},
     SMALLEST_DEGREE_FIRST: {k: pd.read_csv(SMALLEST_DEGREE_FIRST_PATH.format(BIG,k)) for k in k_full},
@@ -28,12 +32,12 @@ dataframes_big = {
     SIMULATED_ANNEALING: {k: pd.read_csv(SIMULATED_ANNEALING_PATH.format(BIG,k)) for k in k_full}   
 }
 
-dataframes_pregen = {
-    WEIGHT_TO_DEGREE: pd.read_csv(PREGEN_WEIGHT_TO_DEGREE_PATH),
-    MONTE_CARLO: pd.read_csv(PREGEN_MONTE_CARLO_PATH),
-    PARALLEL_HEURISTIC_MONTE_CARLO: pd.read_csv(PREGEN_PARALLEL_HEURISTIC_MONTE_CARLO_PATH),
-    SIMULATED_ANNEALING: pd.read_csv(PREGEN_SIMULATED_ANNEALING_PATH)
-}  
+#dataframes_pregen = {
+#    WEIGHT_TO_DEGREE: pd.read_csv(PREGEN_WEIGHT_TO_DEGREE_PATH),
+#    MONTE_CARLO: pd.read_csv(PREGEN_MONTE_CARLO_PATH),
+#    PARALLEL_HEURISTIC_MONTE_CARLO: pd.read_csv(PREGEN_PARALLEL_HEURISTIC_MONTE_CARLO_PATH),
+#    SIMULATED_ANNEALING: pd.read_csv(PREGEN_SIMULATED_ANNEALING_PATH)
+#}  
         
 """ ----- Helper Functions ----- """
 
@@ -356,30 +360,33 @@ def exhaustive_vs_greedy_error_ratio_and_accuracy():
     accuracy_precision_results = {}
 
     # Define the colors for each algorithm
-    algorithm_colors = {
-        WMAX: 'orange',
-        DMIN: 'green',
-        WDMIX: 'purple'
+    colors = {
+        WDMIX: 'blue',
+        MC: 'green',
+        PHMC: 'purple',
+        SA: 'orange'
     }
 
     # Iterate through each k value
-    for idx, k in enumerate(k_values):
+    for idx, k in enumerate(k_full):
         
         # Limit heuristic algorithms to the same solution count as the exhaustive algorithm
-        solution_count = len(dataframes[EXHAUSTIVE][k])
-        df_biggest_weight_first = dataframes[BIGGEST_WEIGHT_FIRST][k].head(solution_count)
-        df_smallest_degree_first = dataframes[SMALLEST_DEGREE_FIRST][k].head(solution_count)
-        df_weight_to_degree = dataframes[WEIGHT_TO_DEGREE][k].head(solution_count)
+        solution_count = len(dataframes_small[EXHAUSTIVE][k])
+        df_weight_to_degree = dataframes_small[WEIGHT_TO_DEGREE][k].head(solution_count)
+        df_monte_carlo = dataframes_small[MONTE_CARLO][k].head(solution_count)
+        df_parallel_heuristic_monte_carlo = dataframes_small[PARALLEL_HEURISTIC_MONTE_CARLO][k].head(solution_count)
+        df_simulated_annealing = dataframes_small[SIMULATED_ANNEALING][k].head(solution_count)
         
         # Structure data in a dictionary for the heuristics
         algorithms_cut = {
-            WMAX: df_biggest_weight_first,
-            DMIN: df_smallest_degree_first,
-            WDMIX: df_weight_to_degree
+            WDMIX: df_weight_to_degree,
+            MC: df_monte_carlo,
+            PHMC: df_parallel_heuristic_monte_carlo,
+            SA: df_simulated_annealing
         }
         
         # Calculate accuracy and precision for solution weight
-        accuracy_precision_df_weight = utils.calculate_accuracy_precision(dataframes[EXHAUSTIVE][k], algorithms_cut, metric=TOTAL_WEIGHT)
+        accuracy_precision_df_weight = utils.calculate_accuracy_precision(dataframes_small[EXHAUSTIVE][k], algorithms_cut, metric=TOTAL_WEIGHT)
         accuracy_precision_df_weight['k'] = k  # Add k value for identification
         
         # Store the resulting DataFrame in the dictionary
@@ -388,15 +395,15 @@ def exhaustive_vs_greedy_error_ratio_and_accuracy():
         # Plot error (the difference between greedy and exhaustive solution weight)
         for name, df in algorithms_cut.items():
             # Calculate error as the difference between exhaustive and greedy solution weight, normalized by exhaustive weight
-            error = (dataframes[EXHAUSTIVE][k][TOTAL_WEIGHT].values - df[TOTAL_WEIGHT].values) / dataframes[EXHAUSTIVE][k][TOTAL_WEIGHT].values
+            error = (dataframes_small[EXHAUSTIVE][k][TOTAL_WEIGHT].values - df[TOTAL_WEIGHT].values) / dataframes_small[EXHAUSTIVE][k][TOTAL_WEIGHT].values
             
             # Plot with the respective color and label
-            axs[idx].plot(dataframes[EXHAUSTIVE][k][NODE_COUNT], error, label=name, color=algorithm_colors[name], alpha=0.65)
+            axs[idx].plot(dataframes_small[EXHAUSTIVE][k][NODE_COUNT], error, label=name, color=colors[name], alpha=0.65)
 
         # Set plot labels and title
         axs[idx].set_xlabel(GRAPH_SIZE_AXIS, fontsize=12)
         axs[idx].set_ylabel('Error (Ratio)', fontsize=12)
-        axs[idx].set_title(f'Error (Greedy - Exhaustive) for k={k}', fontsize=14)
+        axs[idx].set_title(f'Error (Algorithm - Exhaustive) for k={k}', fontsize=14)
         axs[idx].legend(loc=UPPER_RIGHT, fontsize=10)
 
         # Set the grid for better readability
@@ -443,7 +450,7 @@ def monte_carlo_precision():
             precision_values = []
 
             for i in iterations:
-                monte_carlo_weights = dataframes_randomized[algo][k][i][TOTAL_WEIGHT].head(len(exhaustive_weights)).values
+                monte_carlo_weights = dataframes[algo][k][i][TOTAL_WEIGHT].head(len(exhaustive_weights)).values
                 precision = np.mean(monte_carlo_weights / exhaustive_weights)
                 precision_values.append(precision)
             
@@ -473,14 +480,14 @@ def comparison_operations_time():
     and Monte Carlo algorithms (Fig.4 extended).
     """
 
-    space = len(dataframes_randomized[PARALLEL_HEURISTIC_MONTE_CARLO][125][25])
+    space = len(dataframes[PARALLEL_HEURISTIC_MONTE_CARLO][125][25])
     
     def extract_data_avg():
         """ Extract and calculate average data for all algorithms. """
         return [
             calculate_avg_data(
-                {k: dataframes[algorithm][k][NUMBER_OF_OPERATIONS].head(space) if algorithm not in RANDOMIZED_ALGORITHMS else dataframes_randomized[algorithm][k][50][NUMBER_OF_OPERATIONS].head(space) for k in k_values},
-                {k: dataframes[algorithm][k][EXECUTION_TIME].head(space) if algorithm not in RANDOMIZED_ALGORITHMS else dataframes_randomized[algorithm][k][50][EXECUTION_TIME].head(space) for k in k_values}
+                {k: dataframes[algorithm][k][NUMBER_OF_OPERATIONS].head(space) if algorithm not in RANDOMIZED_ALGORITHMS else dataframes[algorithm][k][50][NUMBER_OF_OPERATIONS].head(space) for k in k_values},
+                {k: dataframes[algorithm][k][EXECUTION_TIME].head(space) if algorithm not in RANDOMIZED_ALGORITHMS else dataframes[algorithm][k][50][EXECUTION_TIME].head(space) for k in k_values}
             )
             for algorithm in [
                 BIGGEST_WEIGHT_FIRST, 
@@ -527,84 +534,103 @@ def comparison_operations_time():
     # Log the conclusion of the function
     print("comparison_operations_time() - Done")
     
-#def exhaustive_vs_algorithms_size_weight():
-#    """ 
-#    Compare the solution size and total weight of the greedy and Monte Carlo algorithms 
-#    with the exhaustive algorithm (Fig.6 Extended). 
-#    Also generates the tables for the ranking of all algorithms (Tables 1 and 2 Extended).
-#    """
-#    
-#    chosen_iterations = 250
-#
-#    # Create a figure with subplots
-#    _, axes = plt.subplots(4, 2, figsize=(15, 20), constrained_layout=True)
-#    
-#    # Loop over each k value
-#    for idx, k in enumerate(k_values):
-#        
-#        space = len(dataframes[EXHAUSTIVE][k])
-#
-#        # Plot Solution Size and Total Weight for each algorithm
-#        for algorithm in ALGORITHMS[1:] + RANDOMIZED_ALGORITHMS:
-#            alpha_value = 0.30 if algorithm != EXHAUSTIVE else 1
-#            dataframe = dataframes[algorithm][k] if algorithm not in RANDOMIZED_ALGORITHMS else dataframes_randomized[algorithm][k][chosen_iterations]
-#            dataframe[SOLUTION_SIZE].head(space).plot(ax=axes[idx, 0], label=LABELS[algorithm], color=colors[algorithm], alpha=alpha_value)
-#            dataframe[TOTAL_WEIGHT].head(space).plot(ax=axes[idx, 1], label=LABELS[algorithm], color=colors[algorithm], alpha=alpha_value)
-#        
-#        # Set labels for Solution Size plot
-#        axes[idx, 0].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
-#        axes[idx, 0].set_ylabel(SOLUTION_SIZE, fontsize=8)
-#        axes[idx, 0].set_title(f'Solution Size for k={k}', fontsize=10)
-#        axes[idx, 0].legend(fontsize=7, loc=UPPER_LEFT)
-#
-#        # Set labels for Total Weight plot
-#        axes[idx, 1].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
-#        axes[idx, 1].set_ylabel(TOTAL_WEIGHT, fontsize=8)
-#        axes[idx, 1].set_title(f'Total Weight of Solution for k={k}', fontsize=10)
-#        axes[idx, 1].legend(fontsize=7, loc=UPPER_LEFT)
-#        
-#        # Initialize arrays for rankings
-#        size_ranks = np.zeros((len(ALGORITHMS[1:]) + 2, space))  # Including Monte Carlo algorithms
-#        weight_ranks = np.zeros((len(ALGORITHMS[1:]) + 2, space))
-#        speed_ranks = np.zeros((len(ALGORITHMS[1:]) + 2, space))
-#
-#        # Calculate ranks per graph instance, handling ties
-#        for i in range(space):
-#            solution_sizes = [dataframes[algorithm][k][SOLUTION_SIZE][i] for algorithm in ALGORITHMS[1:]] + [dataframes_randomized[algorithm][k][chosen_iterations][SOLUTION_SIZE][i] for algorithm in RANDOMIZED_ALGORITHMS]
-#            solution_weights = [dataframes[algorithm][k][TOTAL_WEIGHT][i] for algorithm in ALGORITHMS[1:]] + [dataframes_randomized[algorithm][k][chosen_iterations][TOTAL_WEIGHT][i] for algorithm in RANDOMIZED_ALGORITHMS]
-#            solution_speeds = [dataframes[algorithm][k][EXECUTION_TIME][i] for algorithm in ALGORITHMS[1:]] + [dataframes_randomized[algorithm][k][chosen_iterations][EXECUTION_TIME][i] for algorithm in RANDOMIZED_ALGORITHMS]
-#            
-#            # Use rankdata with 'min' to rank from largest to smallest (1 is best, N is worst)
-#            size_ranks[:, i] = 1 + len(solution_sizes) - rankdata(solution_sizes, method='max')
-#            weight_ranks[:, i] = 1 + len(solution_weights) - rankdata(solution_weights, method='max')
-#            speed_ranks[:, i] = rankdata(solution_speeds, method='min')
-#        
-#        # Calculate mean ranks across all graph sizes
-#        size_ranks = np.mean(size_ranks, axis=1)
-#        weight_ranks = np.mean(weight_ranks, axis=1)
-#        speed_ranks = np.mean(speed_ranks, axis=1)
-#
-#        # Prepare ranking table data for current k
-#        ranking_data_k = {
-#            'Algorithm': ALGORITHMS[1:] + RANDOMIZED_ALGORITHMS,
-#            'Solution Size Rank': np.round(size_ranks, 2),
-#            'Total Weight Rank': np.round(weight_ranks, 2),
-#            'Speed Rank': np.round(speed_ranks, 2),
-#            'Average Rank': np.round((size_ranks + weight_ranks + speed_ranks) / 3, 2)
-#        }
-#        ranking_df_k = pd.DataFrame(ranking_data_k).set_index('Algorithm')
-#        ranking_df_k = ranking_df_k.sort_values(by='Average Rank')
-#
-#        # Save table data to CSV
-#        ranking_df_k.to_csv(f'../data/ranking_table_k_{k}_extended.csv')
-#
-#    # Save the main figure with all plots
-#    plt.tight_layout(pad=1.0)
-#    plt.savefig('../images/solution_size_weight_comparison_all_extended.png', dpi=300)
-#    plt.close()
-#    
-#    # Log the conclusion of the function
-#    print("exhaustive_vs_algorithms_size_weight() - Done")
+def exhaustive_vs_algorithms_size_weight():
+    """ 
+    Compare the solution size and total weight of the greedy and Monte Carlo algorithms 
+    with the exhaustive algorithm (Fig.6 Extended). 
+    Also generates the tables for the ranking of all algorithms (Tables 1 and 2 Extended).
+    """
+
+    # Function to rank data from largest to smallest
+    def rank_largest_to_smallest(data):
+        sorted_indices = sorted(range(len(data)), key=lambda x: data[x], reverse=True)
+        ranks = [0] * len(data)
+        for rank, index in enumerate(sorted_indices):
+            ranks[index] = rank + 1
+        return ranks
+
+    # Function to rank data from smallest to largest
+    def rank_smallest_to_largest(data):
+        sorted_indices = sorted(range(len(data)), key=lambda x: data[x])
+        ranks = [0] * len(data)
+        for rank, index in enumerate(sorted_indices):
+            ranks[index] = rank + 1
+        return ranks
+
+    # Create a figure with subplots
+    _, axes = plt.subplots(4, 2, figsize=(15, 20), constrained_layout=True)
+
+    # Algorithms
+    chosen_algorithms = [EXHAUSTIVE, WEIGHT_TO_DEGREE, MONTE_CARLO, PARALLEL_HEURISTIC_MONTE_CARLO, SIMULATED_ANNEALING]
+
+    colors = ['red', 'blue', 'green', 'purple', 'orange', 'cyan']
+    
+    # Loop over each k value
+    for idx, k in enumerate(k_full):
+        
+        space = len(dataframes_small[EXHAUSTIVE][k])
+
+        # Plot Solution Size and Total Weight for each algorithm
+        for idx, algorithm in enumerate(chosen_algorithms):
+            alpha_value = 0.30 if algorithm != EXHAUSTIVE else 1
+            dataframe = dataframes_small[algorithm][k]
+            dataframe[SOLUTION_SIZE].head(space).plot(ax=axes[idx, 0], label=LABELS[algorithm], color=colors[idx], alpha=alpha_value)
+            dataframe[TOTAL_WEIGHT].head(space).plot(ax=axes[idx, 1], label=LABELS[algorithm], color=colors[idx], alpha=alpha_value)
+        
+        # Set labels for Solution Size plot
+        axes[idx, 0].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
+        axes[idx, 0].set_ylabel(SOLUTION_SIZE, fontsize=8)
+        axes[idx, 0].set_title(f'Solution Size for k={k}', fontsize=10)
+        axes[idx, 0].legend(fontsize=7, loc=UPPER_LEFT)
+
+        # Set labels for Total Weight plot
+        axes[idx, 1].set_xlabel(GRAPH_SIZE_AXIS, fontsize=8)
+        axes[idx, 1].set_ylabel(TOTAL_WEIGHT, fontsize=8)
+        axes[idx, 1].set_title(f'Total Weight of Solution for k={k}', fontsize=10)
+        axes[idx, 1].legend(fontsize=7, loc=UPPER_LEFT)
+        
+        # Initialize arrays for rankings
+        size_ranks = np.zeros((5, space))
+        weight_ranks = np.zeros((5, space))
+        speed_ranks = np.zeros((5, space))
+
+        # Calculate ranks per graph instance, handling ties
+        for i in range(space):
+            solution_sizes = [dataframes_small[algorithm][k][SOLUTION_SIZE][i] for algorithm in chosen_algorithms]
+            solution_weights = [dataframes_small[algorithm][k][TOTAL_WEIGHT][i] for algorithm in chosen_algorithms]
+            solution_speeds = [dataframes_small[algorithm][k][EXECUTION_TIME][i] for algorithm in chosen_algorithms]
+            
+            # Use rankdata with 'min' to rank from largest to smallest (1 is best, N is worst)
+            size_ranks[:, i] = rank_largest_to_smallest(solution_sizes)
+            weight_ranks[:, i] = rank_largest_to_smallest(solution_weights)
+            speed_ranks[:, i] = rank_smallest_to_largest(solution_speeds)
+        
+        # Calculate mean ranks across all graph sizes
+        size_ranks = np.mean(size_ranks, axis=1)
+        weight_ranks = np.mean(weight_ranks, axis=1)
+        speed_ranks = np.mean(speed_ranks, axis=1)
+
+        # Prepare ranking table data for current k
+        ranking_data_k = {
+            'Algorithm': chosen_algorithms,
+            'Solution Size Rank': np.round(size_ranks, 2),
+            'Total Weight Rank': np.round(weight_ranks, 2),
+            'Speed Rank': np.round(speed_ranks, 2),
+            'Average Rank': np.round((size_ranks + weight_ranks + speed_ranks) / 3, 2)
+        }
+        ranking_df_k = pd.DataFrame(ranking_data_k).set_index('Algorithm')
+        ranking_df_k = ranking_df_k.sort_values(by='Average Rank')
+
+        # Save table data to CSV
+        ranking_df_k.to_csv(f'../data/ranking_table_k_{k}_extended.csv')
+
+    # Save the main figure with all plots
+    plt.tight_layout(pad=1.0)
+    plt.savefig('../images/solution_size_weight_comparison_all_extended.png', dpi=300)
+    plt.close()
+    
+    # Log the conclusion of the function
+    print("exhaustive_vs_algorithms_size_weight() - Done")
 
 def quick_algo_graph(algorithm, filename):
     """ 
@@ -720,6 +746,199 @@ def quick_algo_compare_graphs(algorithms, dataset=SMALL, k=None, output_filename
     plt.savefig(output_filename, dpi=300)
     plt.close()
 
+def compare_algorithm_k_values(algorithm, dataset=SMALL, output_filename='../images/k_comparison.png'):
+    """ 
+    Compare the k values of the algorithm and save the plot to the given filename. 
+    This is a helper function to quickly visualize the results of an algorithm. 
+
+    Args:
+    algorithm (str) : The algorithm to visualize
+    output_filename (str) : The filename to save the plot to
+    """
+
+    # Create a figure with subplots
+    _, axes = plt.subplots(1, 2, figsize=(12, 6))
+    
+    # Attribute a color to each k value
+    colors = ['red', 'blue', 'green', 'purple']
+    
+    # Set plot labels and titles
+    for i, k in enumerate(k_full):
+        if dataset == SMALL:
+            temp_df = dataframes_small[algorithm]
+        elif dataset == BIG:
+            temp_df = dataframes_big[algorithm]
+        elif dataset == PREGEN:
+            temp_df = dataframes_pregen[algorithm]
+
+        x_values = temp_df[k][NODE_COUNT]
+        temp_df = temp_df[k]
+
+        # Plot Execution Time and Number of Operations for the algorithm
+        axes[0].plot(x_values, temp_df[EXECUTION_TIME], label=f'k={k}', color=colors[i])
+        axes[1].plot(x_values, temp_df[NUMBER_OF_OPERATIONS], label=f'k={k}', color=colors[i])
+
+    # Set labels and legend for both plots
+    axes[0].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[0].set_ylabel(EXECUTION_TIME)
+    axes[0].set_title(f'{algorithm} - Execution Time Comparison')
+    axes[0].legend()
+
+    axes[1].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[1].set_ylabel(NUMBER_OF_OPERATIONS)
+    axes[1].set_title(f'{algorithm} - Number of Operations Comparison')
+    axes[1].legend()
+
+    # Save the plots
+    plt.tight_layout()
+    plt.savefig(output_filename, dpi=300)
+    plt.close()
+
+def compare_algorithms_three(algorithms, k=None, dataset=SMALL, output_filename='../images/comparison_3.png'):
+    """ 
+    Compare the three main metrics of the algorithms and save the plot to the given filename.
+
+    Args:
+    algorithms (list) : The algorithms to visualize
+    dataset (str) : The dataset to use for the comparison
+    output_filename (str) : The filename to save the plot to
+    """
+
+    # Create a figure with subplots
+    _, axes = plt.subplots(3, 1, figsize=(12, 18))
+    
+    # Attribute a color to each algorithm
+    colors = ['red', 'blue', 'green', 'purple', 'orange', 'cyan']
+    
+    # Set plot labels and titles
+    for i, algorithm in enumerate(algorithms):
+        if dataset == SMALL:
+            temp_df = dataframes_small[algorithm]
+        elif dataset == BIG:
+            temp_df = dataframes_big[algorithm]
+        elif dataset == PREGEN:
+            temp_df = dataframes_pregen[algorithm]
+
+        x_values = temp_df[k if k else 0.75][NODE_COUNT]
+        temp_df = temp_df[k] if k else utils.total_average(temp_df)
+
+        alpha = 0.65 if algorithm != EXHAUSTIVE else 1
+        # Plot Solution Size, Total Weight, Execution Time for the algorithm
+        axes[0].plot(x_values, temp_df[TOTAL_WEIGHT], label=algorithm, color=colors[i], alpha=alpha)
+        axes[1].plot(x_values, temp_df[EXECUTION_TIME], label=algorithm, color=colors[i], alpha=alpha)
+        axes[2].plot(x_values, temp_df[NUMBER_OF_OPERATIONS], label=algorithm, color=colors[i], alpha=alpha)
+    
+    # Set labels and legend for all plots
+    axes[0].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[0].set_ylabel(TOTAL_WEIGHT)
+    axes[0].set_title('Total Weight Comparison')
+    axes[0].legend()
+    
+    axes[1].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[1].set_ylabel(EXECUTION_TIME)
+    axes[1].set_title('Execution Time Comparison (logarithmic scale)')
+    axes[1].set_yscale('log')
+    axes[1].legend()
+    
+    axes[2].set_xlabel(GRAPH_SIZE_AXIS)
+    axes[2].set_ylabel(NUMBER_OF_OPERATIONS)
+    axes[2].set_title('Number of Operations Comparison (logarithmic scale)')
+    axes[2].set_yscale('log')
+    axes[2].legend()
+    
+    # Save the plots
+    plt.tight_layout()
+    plt.savefig(output_filename, dpi=300)
+    plt.close()
+
+def rank_algorithms(algorithms, dataset=SMALL, output_filename='../data/ranking_table.csv'):
+    """ 
+    Rank the algorithms based on their performance and save the results to the given filename.
+
+    Args:
+    algorithms (list) : The algorithms to rank
+    dataset (str) : The dataset to use for the ranking
+    output_filename (str) : The filename to save the ranking to
+    """
+
+    # Function to rank data from largest to smallest
+    def rank_largest_to_smallest(data):
+        sorted_indices = sorted(range(len(data)), key=lambda x: data[x], reverse=True)
+        ranks = [0] * len(data)
+        for rank, index in enumerate(sorted_indices):
+            ranks[index] = rank + 1
+        return ranks
+
+    # Function to rank data from smallest to largest
+    def rank_smallest_to_largest(data):
+        sorted_indices = sorted(range(len(data)), key=lambda x: data[x])
+        ranks = [0] * len(data)
+        for rank, index in enumerate(sorted_indices):
+            ranks[index] = rank + 1
+        return ranks
+
+    # Create a DataFrame to store the ranking data
+    ranking_data = {
+        'Algorithm': algorithms,
+        'Average Rank': np.zeros(len(algorithms))
+    }
+    ranking_df = pd.DataFrame(ranking_data).set_index('Algorithm')
+
+    # Loop over each k value
+    for k in k_full:
+        if dataset == SMALL:
+            temp_dfs = [dataframes_small[algorithm][k] for algorithm in algorithms]
+        elif dataset == BIG:
+            temp_dfs = [dataframes_big[algorithm][k] for algorithm in algorithms]
+        elif dataset == PREGEN:
+            temp_dfs = [dataframes_pregen[algorithm][k] for algorithm in algorithms]
+
+        # Calculate ranks per graph instance, handling ties
+        size_ranks = np.zeros((len(algorithms), len(temp_dfs[0])))
+        weight_ranks = np.zeros((len(algorithms), len(temp_dfs[0])))
+        speed_ranks = np.zeros((len(algorithms), len(temp_dfs[0])))
+
+        for i in range(len(temp_dfs[0])):
+            solution_sizes = [temp_df[SOLUTION_SIZE][i] for temp_df in temp_dfs]
+            solution_weights = [temp_df[TOTAL_WEIGHT][i] for temp_df in temp_dfs]
+            solution_speeds = [temp_df[EXECUTION_TIME][i] for temp_df in temp_dfs]
+
+            # Use rankdata with 'min' to rank from largest to smallest (1 is best, N is worst)
+            size_ranks[:, i] = rank_largest_to_smallest(solution_sizes)
+            weight_ranks[:, i] = rank_largest_to_smallest(solution_weights)
+            speed_ranks[:, i] = rank_smallest_to_largest(solution_speeds)
+
+        # Calculate mean ranks across all graph sizes
+        size_ranks = np.mean(size_ranks, axis=1)
+        weight_ranks = np.mean(weight_ranks, axis=1)
+
+        # Update the ranking DataFrame with the average rank
+        ranking_df.loc[algorithms, 'Average Rank'] += (size_ranks + weight_ranks + speed_ranks) / 3
+
+    # Normalize the average rank by the number of k values
+    ranking_df['Average Rank'] /= len(k_full)
+
+    # Save the ranking data to a CSV file
+    ranking_df.to_csv(output_filename)
+
+    # Log the conclusion of the function
+    print("rank_algorithms() - Done")
+
 if __name__ == "__main__":
     # Compare the graphs of the exhaustive, weighted to degree, and all randomized algorithms, using the small dataset    
-    quick_algo_compare_graphs([EXHAUSTIVE, WEIGHT_TO_DEGREE, MONTE_CARLO, PARALLEL_HEURISTIC_MONTE_CARLO, SIMULATED_ANNEALING], dataset=SMALL, k=0.5, output_filename='../images/quick_comparison_small.png')
+    #quick_algo_compare_graphs([EXHAUSTIVE, WEIGHT_TO_DEGREE, MONTE_CARLO, PARALLEL_HEURISTIC_MONTE_CARLO, SIMULATED_ANNEALING], dataset=SMALL, k=0.5, output_filename='../images/quick_comparison_small.png')
+    # Compare the k values of the monte carlo algorithm using the small dataset
+    compare_algorithm_k_values(MONTE_CARLO, dataset=SMALL, output_filename='../images/k_comparison_monte_carlo_small.png')
+    compare_algorithm_k_values(MONTE_CARLO, dataset=BIG, output_filename='../images/k_comparison_monte_carlo_big.png')
+
+    # Compare the three main metrics of the algorithms using the small dataset
+    compare_algorithms_three([EXHAUSTIVE, WEIGHT_TO_DEGREE, MONTE_CARLO, PARALLEL_HEURISTIC_MONTE_CARLO, SIMULATED_ANNEALING], dataset=SMALL, output_filename='../images/comparison_3_small_average.png')
+
+    # Calculate how much more efficient the parallel heuristic monte carlo algorithm is compared to the monte carlo algorithm
+    k = 0.125
+    ratio = dataframes_small[MONTE_CARLO][k][EXECUTION_TIME].mean() / dataframes_small[PARALLEL_HEURISTIC_MONTE_CARLO][k][EXECUTION_TIME].mean()
+    print(f"The Parallel Heuristic Monte Carlo algorithm is {ratio:.2f} times more efficient than the Monte Carlo algorithm.")
+
+    # Error ratio and accuracy of the greedy algorithms in relation to the exhaustive algorithm
+    exhaustive_vs_greedy_error_ratio_and_accuracy()
+    

@@ -226,6 +226,7 @@ class algorithms:
 
         def is_independent(solution, node):
             """Check if adding a node keeps the solution independent."""
+            ops += len(list(G.neighbors(node)))  # Increment for checking all neighbors
             return all(neighbor not in solution for neighbor in G.neighbors(node))
 
         def calculate_weight(solution):
