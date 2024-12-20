@@ -1,0 +1,7 @@
+Algorithm,Solution Size Rank,Total Weight Rank,Speed Rank,Average Rank
+Weight to Degree,2.38,2.91,1.0,2.1
+Exhaustive,1.35,1.0,5.04,2.46
+Biggest Weight First,3.36,2.98,1.11,2.48
+Monte Carlo,1.4,1.8,4.6,2.6
+Smallest Degree First,1.98,5.27,1.0,2.75
+Heuristic Monte Carlo,2.25,1.98,4.98,3.07

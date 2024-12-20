@@ -1,0 +1,5 @@
+Algorithm,Solution Size Rank,Total Weight Rank,Speed Rank,Average Rank
+Weight to Degree,2.05,1.95,1.0,1.67
+Biggest Weight First,2.53,1.96,1.11,1.87
+Exhaustive,1.42,1.0,3.62,2.01
+Smallest Degree First,1.78,3.51,1.0,2.1
