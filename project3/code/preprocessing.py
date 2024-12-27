@@ -1,3 +1,9 @@
+import nltk
+from nltk.corpus import stopwords
+from typing import List
+
+# Ensure the stopwords are downloaded
+nltk.download('stopwords')
 
 def remove_gutenberg_header_footer(text: str) -> str:
     """
@@ -28,17 +34,50 @@ def remove_gutenberg_header_footer(text: str) -> str:
     else:
         raise ValueError("Markers for header and footer not found in the text.")
 
+def remove_stopwords(text: str, language: str) -> str:
+    """
+    Remove stopwords from a given text based on the specified language.
+
+    Args:
+        text (str): The input text.
+        language (str): The language of the stopwords. Must be 'english', 'spanish', or 'hungarian'.
+
+    Returns:
+        str: The text with stopwords removed.
+    """
+    if language not in ['english', 'spanish', 'hungarian']:
+        raise ValueError("Language must be one of: 'english', 'spanish', 'hungarian'.")
+    
+    # Tokenize the text into words
+    words = text.split()
+    
+    # Get the stopwords for the specified language
+    stop_words = set(stopwords.words(language))
+    
+    # Filter out the stopwords
+    filtered_words = [word for word in words if word.lower() not in stop_words]
+    
+    # Join the filtered words back into a string
+    return ' '.join(filtered_words)
+
 def main():
     # Read the text from the file
     books = ["../books/raw/don_quixote_english.txt", "../books/raw/don_quixote_spanish.txt", "../books/raw/don_quixote_hungarian.txt"]
     output_filenames = ["../books/clean/don_quixote_english.txt", "../books/clean/don_quixote_spanish.txt", "../books/clean/don_quixote_hungarian.txt"]
+    languages = ["english", "spanish", "hungarian"]
     
-    for book, output_filename in zip(books, output_filenames):
+    for book, output_filename, language in zip(books, output_filenames, languages):
         with open(book, "r", encoding="UTF-8") as file:
             text = file.read()
             
         # Remove the header and footer
-        text_clean = remove_gutenberg_header_footer(text)
+        text_no_header_footer = remove_gutenberg_header_footer(text)
+
+        # All text to lowercase
+        text_no_header_footer = text_no_header_footer.lower()
+
+        # Remove stopwords
+        text_clean = remove_stopwords(text_no_header_footer, language=language)
         
         # Write the clean text to a new file
         with open(output_filename, "w", encoding="UTF-8") as file:
