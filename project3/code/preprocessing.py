@@ -5,6 +5,12 @@ from typing import List
 # Ensure the stopwords are downloaded
 nltk.download('stopwords')
 
+CUSTOM_STOPWORDS = {
+    "english": [],
+    "spanish": ['—'],
+    "hungarian": ['–']
+}
+
 def remove_gutenberg_header_footer(text: str) -> str:
     """
     Removes the Project Gutenberg header and footer from the text.
@@ -50,12 +56,15 @@ def remove_stopwords(text: str, language: str) -> str:
     
     # Tokenize the text into words
     words = text.split()
+
+    # Remove punctuation
+    words = [word.strip(".,;:!?()[]{}") for word in words if word.strip(".,;:!?()[]{}")]
     
     # Get the stopwords for the specified language
     stop_words = set(stopwords.words(language))
     
     # Filter out the stopwords
-    filtered_words = [word for word in words if word.lower() not in stop_words]
+    filtered_words = [word for word in words if word.lower() not in stop_words and word not in CUSTOM_STOPWORDS[language]]
     
     # Join the filtered words back into a string
     return ' '.join(filtered_words)
