@@ -1,3 +1,4 @@
+from collections import Counter
 import math
 
 class Utils:
@@ -41,3 +42,18 @@ class Utils:
             "median": median,
             "biggest_counter": biggest_counter
         }
+    
+    @staticmethod
+    def filter_rare_words(data: list, min_frequency=2) -> list:
+        """
+        Filter out rare words from the data.
+        
+        Args:
+            data (list): The data stream.
+            min_frequency (int): The minimum frequency of a word to keep.
+            
+        Returns:
+            list: The filtered data stream.
+        """
+        word_counts = Counter(data)
+        return [word for word in data if word_counts[word] >= min_frequency]

@@ -3,7 +3,7 @@
 *.jsonl
 Grafo*.txt
 data_backup*
-
+trash_bin
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
