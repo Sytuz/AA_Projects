@@ -8,7 +8,7 @@ nltk.download('stopwords')
 CUSTOM_STOPWORDS = {
     "english": [],
     "spanish": ['—'],
-    "hungarian": ['–']
+    "french": ['–']
 }
 
 def remove_gutenberg_header_footer(text: str) -> str:
@@ -46,19 +46,22 @@ def remove_stopwords(text: str, language: str) -> str:
 
     Args:
         text (str): The input text.
-        language (str): The language of the stopwords. Must be 'english', 'spanish', or 'hungarian'.
+        language (str): The language of the stopwords. Must be 'english', 'spanish', or 'french'.
 
     Returns:
         str: The text with stopwords removed.
     """
-    if language not in ['english', 'spanish', 'hungarian']:
-        raise ValueError("Language must be one of: 'english', 'spanish', 'hungarian'.")
+    if language not in ['english', 'spanish', 'french']:
+        raise ValueError("Language must be one of: 'english', 'spanish', 'french'.")
     
     # Tokenize the text into words
     words = text.split()
 
     # Remove punctuation
-    words = [word.strip(".,;:!?()[]{}") for word in words if word.strip(".,;:!?()[]{}")]
+    words = [word.strip(".,;:!?()[]{}\"”“") for word in words if word.strip(".,;:!?()[]{}\"”“")]
+
+    # Remove unwanted .jpg
+    words = [word for word in words if ".jpg" not in word]
     
     # Get the stopwords for the specified language
     stop_words = set(stopwords.words(language))
@@ -71,9 +74,9 @@ def remove_stopwords(text: str, language: str) -> str:
 
 def main():
     # Read the text from the file
-    books = ["../books/raw/don_quixote_english.txt", "../books/raw/don_quixote_spanish.txt", "../books/raw/don_quixote_hungarian.txt"]
-    output_filenames = ["../books/clean/don_quixote_english.txt", "../books/clean/don_quixote_spanish.txt", "../books/clean/don_quixote_hungarian.txt"]
-    languages = ["english", "spanish", "hungarian"]
+    books = ["../books/raw/don_quixote_english.txt", "../books/raw/don_quixote_spanish.txt", "../books/raw/don_quixote_french.txt"]
+    output_filenames = ["../books/clean/don_quixote_english.txt", "../books/clean/don_quixote_spanish.txt", "../books/clean/don_quixote_french.txt"]
+    languages = ["english", "spanish", "french"]
     
     for book, output_filename, language in zip(books, output_filenames, languages):
         with open(book, "r", encoding="UTF-8") as file:
