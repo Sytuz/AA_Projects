@@ -4,6 +4,7 @@ from typing import List
 
 # Ensure the stopwords are downloaded
 nltk.download('stopwords')
+nltk.download('punkt_tab')
 
 CUSTOM_STOPWORDS = {
     "english": [],
@@ -55,10 +56,10 @@ def remove_stopwords(text: str, language: str) -> str:
         raise ValueError("Language must be one of: 'english', 'spanish', 'french'.")
     
     # Tokenize the text into words
-    words = text.split()
+    words = nltk.word_tokenize(text)
 
     # Remove punctuation
-    words = [word.strip(".,;:!?()[]{}\"”“") for word in words if word.strip(".,;:!?()[]{}\"”“")]
+    words = [word.strip(".,;:!?()[]{}\"”“‘’—–/") for word in words if word.strip(".,;:!?()[]{}\"”“‘’—–/")]
 
     # Remove unwanted .jpg
     words = [word for word in words if ".jpg" not in word]

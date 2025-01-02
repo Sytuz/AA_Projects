@@ -1,0 +1,26 @@
+{
+    "exact": {
+        "total": 36135,
+        "average_memory": 2.1734031035727175,
+        "median": 3,
+        "biggest_counter": 12
+    },
+    "approx": {
+        "total": 24191,
+        "average_memory": 1.9603727714748784,
+        "median": 1,
+        "biggest_counter": 11
+    },
+    "misra_gries": {
+        "total": 2257,
+        "average_memory": 3.45635528330781,
+        "median": 3,
+        "biggest_counter": 12
+    },
+    "count_min_sketch": {
+        "total": 7945,
+        "average_memory": 9.736519607843137,
+        "median": 10,
+        "biggest_counter": 13
+    }
+}

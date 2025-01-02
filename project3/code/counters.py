@@ -2,6 +2,7 @@ from datasketches import frequent_strings_sketch, frequent_items_error_type
 from count_min_sketch import CountMinSketch
 from utils import Utils
 import random
+from typing import Tuple
 
 class Counters:
 
@@ -28,19 +29,20 @@ class Counters:
     @staticmethod
     # Count the approximate frequency of each word in the data
     # Fixed probability counter : 1/2 (1/2^k, k=1)
-    def approx_counter(data: list) -> dict:
+    def approx_counter(data: list, p: float = 0.5) -> dict:
         """
-        Approximate counter with fixed probability of 1/2.
+        Approximate counter with fixed probability of p, default is 0.5.
         
         Args:
             data (list): The data stream.
+            p (float): The probability of counting each data item.
             
         Returns:
             dict: A dictionary of the approximate counts for each data item.
         """
         counters = {}
         for word in data:
-            if random.random() < 0.5:
+            if random.random() < p:
                 if word in counters:
                     counters[word] += 1
                 else:
@@ -81,8 +83,7 @@ class Counters:
     @staticmethod
     # Count-Min Sketch Algorithm
     # https://www.sciencedirect.com/science/article/abs/pii/S0196677403001913
-
-    def count_min_sketch(data: list, k: int, h: int, n:int) -> dict:
+    def count_min_sketch(data: list, k: int, h: int, n: int) -> Tuple[dict, dict]:
         """
         Count-Min Sketch Algorithm for estimating the frequency of items in a data stream.
         
@@ -99,7 +100,7 @@ class Counters:
         for word in data:
             cms.add(word)
         
-        return cms.top_n()
+        return cms.top_n(), cms.memory_details()
     
     #@staticmethod
     # Data Sketches Algorithm
